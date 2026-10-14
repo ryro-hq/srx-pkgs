@@ -13,7 +13,7 @@ error_log stderr;
 pid /tmp/nginx.pid;
 events {}
 http {
-    access_log /dev/stdout;
+    access_log off;
     client_body_temp_path /tmp/client-body;
     proxy_temp_path /tmp/proxy;
     fastcgi_temp_path /tmp/fastcgi;

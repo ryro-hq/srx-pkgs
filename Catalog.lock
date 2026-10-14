@@ -5,17 +5,17 @@
     {
       "package": {
         "name": "nginx",
-        "version": "1.30.6",
+        "version": "1.30.5",
         "variant": "minimal",
         "system": "linux-x86_64-gnu",
-        "source_url": "https://nginx.org/download/nginx-1.30.6.tar.gz",
-        "source_sha256": "3cf46f5ed7504d460125866b7bea99fb357f31d887e2e63b35503310e9b8b6c8",
+        "source_url": "https://nginx.org/download/nginx-1.30.5.tar.gz",
+        "source_sha256": "6c20565aa2325cb82216ae804f4a4ff1875179014759a381c42ddc8e11c4906d",
         "source_maximum_bytes": 2097152,
-        "signature_url": "https://nginx.org/download/nginx-1.30.6.tar.gz.asc",
-        "recipe": "recipes/versioned_nginx_1_30_6_gnu.srx",
+        "signature_url": "https://nginx.org/download/nginx-1.30.5.tar.gz.asc",
+        "recipe": "recipes/versioned_nginx_1_30_5_gnu.srx",
         "factory": "nginx",
-        "export": "versioned_nginx_1_30_6_gnu",
-        "source": "recipes/versioned_nginx_source_1_30_6.srx",
+        "export": "versioned_nginx_1_30_5_gnu",
+        "source": "recipes/versioned_nginx_source_1_30_5.srx",
         "contract": "recipes/contracts_nginx.srx",
         "contract_type": "Settings",
         "toolchain": "toolchains/linux-x86_64-gnu.toml",
@@ -28,15 +28,15 @@
       "inputs": {
         "@signing-authority": "de1c283af877f6341ec2e1de9fd7f690d18732f5657b6c5a0aaa5275c7a10d16",
         "keys/nginx.asc": "9a70c136946c1d18d5355c41516f1bdc95d4321938919e69065533e2aeb51e0e",
-        "recipes/contracts_nginx.srx": "b6c694abe5f27d3c19d75885d78ecad207037104831b4ca3a14ce370dbd792c6",
-        "recipes/glibc.srx": "63e6e4fe5f356699fd1922738a0ab7f30635eb93bf4fca9acb87af168586cbb5",
+        "recipes/contracts_nginx.srx": "6fdaea8e0648f7913cf5ce418df0066baac3d6d23d274de0d0c094c79ea4e61e",
+        "recipes/glibc.srx": "de29725fa8ac026bd5a8c01f99b772610dbcb1353564b6f81bea168ce363c738",
         "recipes/glibc_source.srx": "9db5d82da9055128f119ccee522291e6eeaf2cd3a1f4b037ce1364d1a16dc88e",
-        "recipes/nginx_version_build.srx": "4bb3c78ba7b6c2ca03c6cf9e496e6a4b593a22c2cd8cca35bc85672dc2939e38",
-        "recipes/versioned_nginx_1_30_6_gnu.srx": "60c0fb01cb60db23b2a1c86b91aea577f1346b9165e0d456dae3d17ed388b675",
-        "recipes/versioned_nginx_source_1_30_6.srx": "ac81a6d0e0dec522220a9785d2db72ab330feba6a13007f9ee38db123302338a",
+        "recipes/nginx_version_build.srx": "ad3c989a9a84b51044a2cd121f4d2d4c52ed7d9e6417927350897922b723ca5f",
+        "recipes/versioned_nginx_1_30_5_gnu.srx": "fb704a8ad84f2fcad1ca4251f33f76d9e7a386195f0fdef497d88864d1db4f4d",
+        "recipes/versioned_nginx_source_1_30_5.srx": "e5d46a410534e7470c5ffd8a7a8ec35593aa6f9d63c072f35c42c5c145455b1f",
         "toolchains/linux-x86_64-gnu.toml": "7891b6e663886a3d008d477ec95893160a5b537fb9321cff88846c3bcc5d5c45"
       },
-      "identity": "170cf454bfe47a3d0744aacbea5bd0dc5b1bc04ed19235dd2f268454a7e206bf"
+      "identity": "2956c5f9765ce26a471da9a201b3ec47a03e97868dd086d07f96456c33d37ebd"
     },
     {
       "package": {
@@ -62,49 +62,13 @@
       "inputs": {
         "@signing-authority": "de1c283af877f6341ec2e1de9fd7f690d18732f5657b6c5a0aaa5275c7a10d16",
         "keys/nginx.asc": "9a70c136946c1d18d5355c41516f1bdc95d4321938919e69065533e2aeb51e0e",
-        "recipes/contracts_nginx.srx": "b6c694abe5f27d3c19d75885d78ecad207037104831b4ca3a14ce370dbd792c6",
-        "recipes/nginx_version_build.srx": "4bb3c78ba7b6c2ca03c6cf9e496e6a4b593a22c2cd8cca35bc85672dc2939e38",
-        "recipes/versioned_nginx_1_30_5_musl.srx": "3a3ec0a64181cd1d02b68e224698ea3c87edc6e4de400fd6daae27ff57e92fad",
+        "recipes/contracts_nginx.srx": "6fdaea8e0648f7913cf5ce418df0066baac3d6d23d274de0d0c094c79ea4e61e",
+        "recipes/nginx_version_build.srx": "ad3c989a9a84b51044a2cd121f4d2d4c52ed7d9e6417927350897922b723ca5f",
+        "recipes/versioned_nginx_1_30_5_musl.srx": "04c09566d157c81af0b76b1ad82fcf6deda4b21306713f5e8f9a5c0f2d0ded5b",
         "recipes/versioned_nginx_source_1_30_5.srx": "e5d46a410534e7470c5ffd8a7a8ec35593aa6f9d63c072f35c42c5c145455b1f",
         "toolchains/linux-x86_64-musl.toml": "de4057063129fb8fb74235dc406bf2e965fd29a7ae270c2c1cfff9b2cc591a68"
       },
-      "identity": "51a1c7ac994294432820ba758e5ab2964c6ffe25e0b6745421c89e09bfaff849"
-    },
-    {
-      "package": {
-        "name": "nginx",
-        "version": "1.30.5",
-        "variant": "minimal",
-        "system": "linux-x86_64-gnu",
-        "source_url": "https://nginx.org/download/nginx-1.30.5.tar.gz",
-        "source_sha256": "6c20565aa2325cb82216ae804f4a4ff1875179014759a381c42ddc8e11c4906d",
-        "source_maximum_bytes": 2097152,
-        "signature_url": "https://nginx.org/download/nginx-1.30.5.tar.gz.asc",
-        "recipe": "recipes/versioned_nginx_1_30_5_gnu.srx",
-        "factory": "nginx",
-        "export": "versioned_nginx_1_30_5_gnu",
-        "source": "recipes/versioned_nginx_source_1_30_5.srx",
-        "contract": "recipes/contracts_nginx.srx",
-        "contract_type": "Settings",
-        "toolchain": "toolchains/linux-x86_64-gnu.toml",
-        "recipe_inputs": [
-          "recipes/nginx_version_build.srx",
-          "recipes/glibc.srx",
-          "recipes/glibc_source.srx"
-        ]
-      },
-      "inputs": {
-        "@signing-authority": "de1c283af877f6341ec2e1de9fd7f690d18732f5657b6c5a0aaa5275c7a10d16",
-        "keys/nginx.asc": "9a70c136946c1d18d5355c41516f1bdc95d4321938919e69065533e2aeb51e0e",
-        "recipes/contracts_nginx.srx": "b6c694abe5f27d3c19d75885d78ecad207037104831b4ca3a14ce370dbd792c6",
-        "recipes/glibc.srx": "63e6e4fe5f356699fd1922738a0ab7f30635eb93bf4fca9acb87af168586cbb5",
-        "recipes/glibc_source.srx": "9db5d82da9055128f119ccee522291e6eeaf2cd3a1f4b037ce1364d1a16dc88e",
-        "recipes/nginx_version_build.srx": "4bb3c78ba7b6c2ca03c6cf9e496e6a4b593a22c2cd8cca35bc85672dc2939e38",
-        "recipes/versioned_nginx_1_30_5_gnu.srx": "bc8f67fae1b8ebcc044e146d9d7a7dfae8553ea8c04c6d982e17b7645d8ef285",
-        "recipes/versioned_nginx_source_1_30_5.srx": "e5d46a410534e7470c5ffd8a7a8ec35593aa6f9d63c072f35c42c5c145455b1f",
-        "toolchains/linux-x86_64-gnu.toml": "7891b6e663886a3d008d477ec95893160a5b537fb9321cff88846c3bcc5d5c45"
-      },
-      "identity": "9ffa1cbd8d8fcabd493d5906fb92df5afa5f7912d90c69cc9dcf08f8f847b20b"
+      "identity": "306c0f4bc8b6170538197c90e40aa31230e75e3fd8aabe627480b5f58732b5cd"
     },
     {
       "package": {
@@ -140,6 +104,38 @@
     },
     {
       "package": {
+        "name": "nginx",
+        "version": "1.30.6",
+        "variant": "minimal",
+        "system": "linux-x86_64-musl",
+        "source_url": "https://nginx.org/download/nginx-1.30.6.tar.gz",
+        "source_sha256": "3cf46f5ed7504d460125866b7bea99fb357f31d887e2e63b35503310e9b8b6c8",
+        "source_maximum_bytes": 2097152,
+        "signature_url": "https://nginx.org/download/nginx-1.30.6.tar.gz.asc",
+        "recipe": "recipes/versioned_nginx_1_30_6_musl.srx",
+        "factory": "nginx",
+        "export": "versioned_nginx_1_30_6_musl",
+        "source": "recipes/versioned_nginx_source_1_30_6.srx",
+        "contract": "recipes/contracts_nginx.srx",
+        "contract_type": "Settings",
+        "toolchain": "toolchains/linux-x86_64-musl.toml",
+        "recipe_inputs": [
+          "recipes/nginx_version_build.srx"
+        ]
+      },
+      "inputs": {
+        "@signing-authority": "de1c283af877f6341ec2e1de9fd7f690d18732f5657b6c5a0aaa5275c7a10d16",
+        "keys/nginx.asc": "9a70c136946c1d18d5355c41516f1bdc95d4321938919e69065533e2aeb51e0e",
+        "recipes/contracts_nginx.srx": "6fdaea8e0648f7913cf5ce418df0066baac3d6d23d274de0d0c094c79ea4e61e",
+        "recipes/nginx_version_build.srx": "ad3c989a9a84b51044a2cd121f4d2d4c52ed7d9e6417927350897922b723ca5f",
+        "recipes/versioned_nginx_1_30_6_musl.srx": "18492c663292ff3b799a4186dda7e1e1c96aca1a0ed59454ab8f3845c26bf2ec",
+        "recipes/versioned_nginx_source_1_30_6.srx": "ac81a6d0e0dec522220a9785d2db72ab330feba6a13007f9ee38db123302338a",
+        "toolchains/linux-x86_64-musl.toml": "de4057063129fb8fb74235dc406bf2e965fd29a7ae270c2c1cfff9b2cc591a68"
+      },
+      "identity": "dce90f0e6d36d64313c26357b68ecae84515be7c46e1fbafcd2b011d97472c69"
+    },
+    {
+      "package": {
         "name": "hello",
         "version": "2.12.1",
         "variant": "default",
@@ -164,45 +160,49 @@
         "@signing-authority": "b532389ef83330dcaea7a24f530ffcf315612da98cd328e2072ddf221962fa04",
         "keys/hello.asc": "ff29837038738302c5a6357c1184648e99688944e6c75aa0f306a0b657ea9ba0",
         "recipes/contracts_hello.srx": "7cce11f625331d256c1da710d36d675eb51a8160f1a1f04e750dee01f1fa81ca",
-        "recipes/glibc.srx": "63e6e4fe5f356699fd1922738a0ab7f30635eb93bf4fca9acb87af168586cbb5",
+        "recipes/glibc.srx": "de29725fa8ac026bd5a8c01f99b772610dbcb1353564b6f81bea168ce363c738",
         "recipes/glibc_source.srx": "9db5d82da9055128f119ccee522291e6eeaf2cd3a1f4b037ce1364d1a16dc88e",
         "recipes/versioned_hello_2_12_1_gnu.srx": "8249b9ae17c081b417be5e08d165952b9fb040d1273500494711b0aa7be79a76",
         "recipes/versioned_hello_source_2_12_1.srx": "486840a29950f7dc4fee235af5f0a3c2f57c621751f1e1f2089b873ed668ff8b",
         "toolchains/linux-x86_64-gnu.toml": "7891b6e663886a3d008d477ec95893160a5b537fb9321cff88846c3bcc5d5c45"
       },
-      "identity": "d18e503eaedafcd504c697f85bc30bdb73c121490ba77a277d3015d0589ee18e"
+      "identity": "de38dea6d447d804296a81f8d62ca4f0c022002bc7f404a066f7c73a32ddd7b4"
     },
     {
       "package": {
         "name": "nginx",
         "version": "1.30.6",
         "variant": "minimal",
-        "system": "linux-x86_64-musl",
+        "system": "linux-x86_64-gnu",
         "source_url": "https://nginx.org/download/nginx-1.30.6.tar.gz",
         "source_sha256": "3cf46f5ed7504d460125866b7bea99fb357f31d887e2e63b35503310e9b8b6c8",
         "source_maximum_bytes": 2097152,
         "signature_url": "https://nginx.org/download/nginx-1.30.6.tar.gz.asc",
-        "recipe": "recipes/versioned_nginx_1_30_6_musl.srx",
+        "recipe": "recipes/versioned_nginx_1_30_6_gnu.srx",
         "factory": "nginx",
-        "export": "versioned_nginx_1_30_6_musl",
+        "export": "versioned_nginx_1_30_6_gnu",
         "source": "recipes/versioned_nginx_source_1_30_6.srx",
         "contract": "recipes/contracts_nginx.srx",
         "contract_type": "Settings",
-        "toolchain": "toolchains/linux-x86_64-musl.toml",
+        "toolchain": "toolchains/linux-x86_64-gnu.toml",
         "recipe_inputs": [
-          "recipes/nginx_version_build.srx"
+          "recipes/nginx_version_build.srx",
+          "recipes/glibc.srx",
+          "recipes/glibc_source.srx"
         ]
       },
       "inputs": {
         "@signing-authority": "de1c283af877f6341ec2e1de9fd7f690d18732f5657b6c5a0aaa5275c7a10d16",
         "keys/nginx.asc": "9a70c136946c1d18d5355c41516f1bdc95d4321938919e69065533e2aeb51e0e",
-        "recipes/contracts_nginx.srx": "b6c694abe5f27d3c19d75885d78ecad207037104831b4ca3a14ce370dbd792c6",
-        "recipes/nginx_version_build.srx": "4bb3c78ba7b6c2ca03c6cf9e496e6a4b593a22c2cd8cca35bc85672dc2939e38",
-        "recipes/versioned_nginx_1_30_6_musl.srx": "6202392062d9bb0672c4aeb9663ce7fc143cb9cb80d5e7bb953c09fd0c0f500d",
+        "recipes/contracts_nginx.srx": "6fdaea8e0648f7913cf5ce418df0066baac3d6d23d274de0d0c094c79ea4e61e",
+        "recipes/glibc.srx": "de29725fa8ac026bd5a8c01f99b772610dbcb1353564b6f81bea168ce363c738",
+        "recipes/glibc_source.srx": "9db5d82da9055128f119ccee522291e6eeaf2cd3a1f4b037ce1364d1a16dc88e",
+        "recipes/nginx_version_build.srx": "ad3c989a9a84b51044a2cd121f4d2d4c52ed7d9e6417927350897922b723ca5f",
+        "recipes/versioned_nginx_1_30_6_gnu.srx": "41cfd53b6750eb25a9d3cbc88197d070b9f97774988d7016168fe7c59e114eca",
         "recipes/versioned_nginx_source_1_30_6.srx": "ac81a6d0e0dec522220a9785d2db72ab330feba6a13007f9ee38db123302338a",
-        "toolchains/linux-x86_64-musl.toml": "de4057063129fb8fb74235dc406bf2e965fd29a7ae270c2c1cfff9b2cc591a68"
+        "toolchains/linux-x86_64-gnu.toml": "7891b6e663886a3d008d477ec95893160a5b537fb9321cff88846c3bcc5d5c45"
       },
-      "identity": "eb557596cc311e37a87e6ef58a02a2981d061718edc51016a1d4e70a961ae659"
+      "identity": "df061680cc009be97ea0c22e300f291fac010844810f186d22cd12ab68bf578f"
     }
   ],
   "retained": [
@@ -269,6 +269,42 @@
     {
       "package": {
         "name": "nginx",
+        "version": "1.30.6",
+        "variant": "minimal",
+        "system": "linux-x86_64-gnu",
+        "source_url": "https://nginx.org/download/nginx-1.30.6.tar.gz",
+        "source_sha256": "3cf46f5ed7504d460125866b7bea99fb357f31d887e2e63b35503310e9b8b6c8",
+        "source_maximum_bytes": 2097152,
+        "signature_url": "https://nginx.org/download/nginx-1.30.6.tar.gz.asc",
+        "recipe": "recipes/versioned_nginx_1_30_6_gnu.srx",
+        "factory": "nginx",
+        "export": "versioned_nginx_1_30_6_gnu",
+        "source": "recipes/versioned_nginx_source_1_30_6.srx",
+        "contract": "recipes/contracts_nginx.srx",
+        "contract_type": "Settings",
+        "toolchain": "toolchains/linux-x86_64-gnu.toml",
+        "recipe_inputs": [
+          "recipes/nginx_version_build.srx",
+          "recipes/glibc.srx",
+          "recipes/glibc_source.srx"
+        ]
+      },
+      "inputs": {
+        "@signing-authority": "de1c283af877f6341ec2e1de9fd7f690d18732f5657b6c5a0aaa5275c7a10d16",
+        "keys/nginx.asc": "9a70c136946c1d18d5355c41516f1bdc95d4321938919e69065533e2aeb51e0e",
+        "recipes/contracts_nginx.srx": "b6c694abe5f27d3c19d75885d78ecad207037104831b4ca3a14ce370dbd792c6",
+        "recipes/glibc.srx": "63e6e4fe5f356699fd1922738a0ab7f30635eb93bf4fca9acb87af168586cbb5",
+        "recipes/glibc_source.srx": "9db5d82da9055128f119ccee522291e6eeaf2cd3a1f4b037ce1364d1a16dc88e",
+        "recipes/nginx_version_build.srx": "4bb3c78ba7b6c2ca03c6cf9e496e6a4b593a22c2cd8cca35bc85672dc2939e38",
+        "recipes/versioned_nginx_1_30_6_gnu.srx": "60c0fb01cb60db23b2a1c86b91aea577f1346b9165e0d456dae3d17ed388b675",
+        "recipes/versioned_nginx_source_1_30_6.srx": "ac81a6d0e0dec522220a9785d2db72ab330feba6a13007f9ee38db123302338a",
+        "toolchains/linux-x86_64-gnu.toml": "7891b6e663886a3d008d477ec95893160a5b537fb9321cff88846c3bcc5d5c45"
+      },
+      "identity": "170cf454bfe47a3d0744aacbea5bd0dc5b1bc04ed19235dd2f268454a7e206bf"
+    },
+    {
+      "package": {
+        "name": "nginx",
         "version": "1.30.5",
         "variant": "minimal",
         "system": "linux-x86_64-musl",
@@ -297,6 +333,78 @@
         "toolchains/linux-x86_64-musl.toml": "de4057063129fb8fb74235dc406bf2e965fd29a7ae270c2c1cfff9b2cc591a68"
       },
       "identity": "18e7e15c5ef22126dc06fa38f840ac1afa31ad0e1e81ac9ef6c82e4746685f75"
+    },
+    {
+      "package": {
+        "name": "nginx",
+        "version": "1.30.5",
+        "variant": "minimal",
+        "system": "linux-x86_64-gnu",
+        "source_url": "https://nginx.org/download/nginx-1.30.5.tar.gz",
+        "source_sha256": "6c20565aa2325cb82216ae804f4a4ff1875179014759a381c42ddc8e11c4906d",
+        "source_maximum_bytes": 2097152,
+        "signature_url": "https://nginx.org/download/nginx-1.30.5.tar.gz.asc",
+        "recipe": "recipes/versioned_nginx_1_30_5_gnu.srx",
+        "factory": "nginx",
+        "export": "versioned_nginx_1_30_5_gnu",
+        "source": "recipes/versioned_nginx_source_1_30_5.srx",
+        "contract": "recipes/contracts_nginx.srx",
+        "contract_type": "Settings",
+        "toolchain": "toolchains/linux-x86_64-gnu.toml",
+        "recipe_inputs": [
+          "recipes/nginx_version_build.srx",
+          "recipes/glibc.srx",
+          "recipes/glibc_source.srx"
+        ]
+      },
+      "inputs": {
+        "@signing-authority": "de1c283af877f6341ec2e1de9fd7f690d18732f5657b6c5a0aaa5275c7a10d16",
+        "keys/nginx.asc": "9a70c136946c1d18d5355c41516f1bdc95d4321938919e69065533e2aeb51e0e",
+        "recipes/contracts_nginx.srx": "b6c694abe5f27d3c19d75885d78ecad207037104831b4ca3a14ce370dbd792c6",
+        "recipes/glibc.srx": "de29725fa8ac026bd5a8c01f99b772610dbcb1353564b6f81bea168ce363c738",
+        "recipes/glibc_source.srx": "9db5d82da9055128f119ccee522291e6eeaf2cd3a1f4b037ce1364d1a16dc88e",
+        "recipes/nginx_version_build.srx": "4bb3c78ba7b6c2ca03c6cf9e496e6a4b593a22c2cd8cca35bc85672dc2939e38",
+        "recipes/versioned_nginx_1_30_5_gnu.srx": "bc8f67fae1b8ebcc044e146d9d7a7dfae8553ea8c04c6d982e17b7645d8ef285",
+        "recipes/versioned_nginx_source_1_30_5.srx": "e5d46a410534e7470c5ffd8a7a8ec35593aa6f9d63c072f35c42c5c145455b1f",
+        "toolchains/linux-x86_64-gnu.toml": "7891b6e663886a3d008d477ec95893160a5b537fb9321cff88846c3bcc5d5c45"
+      },
+      "identity": "192085050c9943fe9bec6137c8b74304feb657541a9366fcd6b5d56a786b4906"
+    },
+    {
+      "package": {
+        "name": "nginx",
+        "version": "1.30.6",
+        "variant": "minimal",
+        "system": "linux-x86_64-gnu",
+        "source_url": "https://nginx.org/download/nginx-1.30.6.tar.gz",
+        "source_sha256": "3cf46f5ed7504d460125866b7bea99fb357f31d887e2e63b35503310e9b8b6c8",
+        "source_maximum_bytes": 2097152,
+        "signature_url": "https://nginx.org/download/nginx-1.30.6.tar.gz.asc",
+        "recipe": "recipes/versioned_nginx_1_30_6_gnu.srx",
+        "factory": "nginx",
+        "export": "versioned_nginx_1_30_6_gnu",
+        "source": "recipes/versioned_nginx_source_1_30_6.srx",
+        "contract": "recipes/contracts_nginx.srx",
+        "contract_type": "Settings",
+        "toolchain": "toolchains/linux-x86_64-gnu.toml",
+        "recipe_inputs": [
+          "recipes/nginx_version_build.srx",
+          "recipes/glibc.srx",
+          "recipes/glibc_source.srx"
+        ]
+      },
+      "inputs": {
+        "@signing-authority": "de1c283af877f6341ec2e1de9fd7f690d18732f5657b6c5a0aaa5275c7a10d16",
+        "keys/nginx.asc": "9a70c136946c1d18d5355c41516f1bdc95d4321938919e69065533e2aeb51e0e",
+        "recipes/contracts_nginx.srx": "b6c694abe5f27d3c19d75885d78ecad207037104831b4ca3a14ce370dbd792c6",
+        "recipes/glibc.srx": "de29725fa8ac026bd5a8c01f99b772610dbcb1353564b6f81bea168ce363c738",
+        "recipes/glibc_source.srx": "9db5d82da9055128f119ccee522291e6eeaf2cd3a1f4b037ce1364d1a16dc88e",
+        "recipes/nginx_version_build.srx": "4bb3c78ba7b6c2ca03c6cf9e496e6a4b593a22c2cd8cca35bc85672dc2939e38",
+        "recipes/versioned_nginx_1_30_6_gnu.srx": "60c0fb01cb60db23b2a1c86b91aea577f1346b9165e0d456dae3d17ed388b675",
+        "recipes/versioned_nginx_source_1_30_6.srx": "ac81a6d0e0dec522220a9785d2db72ab330feba6a13007f9ee38db123302338a",
+        "toolchains/linux-x86_64-gnu.toml": "7891b6e663886a3d008d477ec95893160a5b537fb9321cff88846c3bcc5d5c45"
+      },
+      "identity": "1d1675f8c5b2cc01320623fb03ecfb8faa2043cda20c5657c1cc4a4bf9500e3b"
     },
     {
       "package": {
@@ -432,6 +540,38 @@
         "toolchains/linux-x86_64-musl.toml": "de4057063129fb8fb74235dc406bf2e965fd29a7ae270c2c1cfff9b2cc591a68"
       },
       "identity": "51127e3fb787c303e2ae73445c54f324d12d9b87f455fd8c01f8fc69709bd3f8"
+    },
+    {
+      "package": {
+        "name": "nginx",
+        "version": "1.30.5",
+        "variant": "minimal",
+        "system": "linux-x86_64-musl",
+        "source_url": "https://nginx.org/download/nginx-1.30.5.tar.gz",
+        "source_sha256": "6c20565aa2325cb82216ae804f4a4ff1875179014759a381c42ddc8e11c4906d",
+        "source_maximum_bytes": 2097152,
+        "signature_url": "https://nginx.org/download/nginx-1.30.5.tar.gz.asc",
+        "recipe": "recipes/versioned_nginx_1_30_5_musl.srx",
+        "factory": "nginx",
+        "export": "versioned_nginx_1_30_5_musl",
+        "source": "recipes/versioned_nginx_source_1_30_5.srx",
+        "contract": "recipes/contracts_nginx.srx",
+        "contract_type": "Settings",
+        "toolchain": "toolchains/linux-x86_64-musl.toml",
+        "recipe_inputs": [
+          "recipes/nginx_version_build.srx"
+        ]
+      },
+      "inputs": {
+        "@signing-authority": "de1c283af877f6341ec2e1de9fd7f690d18732f5657b6c5a0aaa5275c7a10d16",
+        "keys/nginx.asc": "9a70c136946c1d18d5355c41516f1bdc95d4321938919e69065533e2aeb51e0e",
+        "recipes/contracts_nginx.srx": "b6c694abe5f27d3c19d75885d78ecad207037104831b4ca3a14ce370dbd792c6",
+        "recipes/nginx_version_build.srx": "4bb3c78ba7b6c2ca03c6cf9e496e6a4b593a22c2cd8cca35bc85672dc2939e38",
+        "recipes/versioned_nginx_1_30_5_musl.srx": "3a3ec0a64181cd1d02b68e224698ea3c87edc6e4de400fd6daae27ff57e92fad",
+        "recipes/versioned_nginx_source_1_30_5.srx": "e5d46a410534e7470c5ffd8a7a8ec35593aa6f9d63c072f35c42c5c145455b1f",
+        "toolchains/linux-x86_64-musl.toml": "de4057063129fb8fb74235dc406bf2e965fd29a7ae270c2c1cfff9b2cc591a68"
+      },
+      "identity": "51a1c7ac994294432820ba758e5ab2964c6ffe25e0b6745421c89e09bfaff849"
     },
     {
       "package": {
@@ -600,6 +740,76 @@
         "contract": "recipes/contracts_nginx.srx",
         "contract_type": "Settings",
         "toolchain": "toolchains/linux-x86_64-gnu.toml",
+        "recipe_inputs": [
+          "recipes/nginx_version_build.srx",
+          "recipes/glibc.srx",
+          "recipes/glibc_source.srx"
+        ]
+      },
+      "inputs": {
+        "@signing-authority": "de1c283af877f6341ec2e1de9fd7f690d18732f5657b6c5a0aaa5275c7a10d16",
+        "keys/nginx.asc": "9a70c136946c1d18d5355c41516f1bdc95d4321938919e69065533e2aeb51e0e",
+        "recipes/contracts_nginx.srx": "b6c694abe5f27d3c19d75885d78ecad207037104831b4ca3a14ce370dbd792c6",
+        "recipes/glibc.srx": "63e6e4fe5f356699fd1922738a0ab7f30635eb93bf4fca9acb87af168586cbb5",
+        "recipes/glibc_source.srx": "9db5d82da9055128f119ccee522291e6eeaf2cd3a1f4b037ce1364d1a16dc88e",
+        "recipes/nginx_version_build.srx": "4bb3c78ba7b6c2ca03c6cf9e496e6a4b593a22c2cd8cca35bc85672dc2939e38",
+        "recipes/versioned_nginx_1_30_5_gnu.srx": "bc8f67fae1b8ebcc044e146d9d7a7dfae8553ea8c04c6d982e17b7645d8ef285",
+        "recipes/versioned_nginx_source_1_30_5.srx": "e5d46a410534e7470c5ffd8a7a8ec35593aa6f9d63c072f35c42c5c145455b1f",
+        "toolchains/linux-x86_64-gnu.toml": "7891b6e663886a3d008d477ec95893160a5b537fb9321cff88846c3bcc5d5c45"
+      },
+      "identity": "9ffa1cbd8d8fcabd493d5906fb92df5afa5f7912d90c69cc9dcf08f8f847b20b"
+    },
+    {
+      "package": {
+        "name": "hello",
+        "version": "2.12.1",
+        "variant": "default",
+        "system": "linux-x86_64-gnu",
+        "source_url": "https://ftp.gnu.org/gnu/hello/hello-2.12.1.tar.gz",
+        "source_sha256": "8d99142afd92576f30b0cd7cb42a8dc6809998bc5d607d88761f512e26c7db20",
+        "source_maximum_bytes": 2097152,
+        "signature_url": "https://ftp.gnu.org/gnu/hello/hello-2.12.1.tar.gz.sig",
+        "recipe": "recipes/versioned_hello_2_12_1_gnu.srx",
+        "factory": "hello_version",
+        "export": "versioned_hello_2_12_1_gnu",
+        "source": "recipes/versioned_hello_source_2_12_1.srx",
+        "contract": "recipes/contracts_hello.srx",
+        "contract_type": "Settings",
+        "toolchain": "toolchains/linux-x86_64-gnu.toml",
+        "recipe_inputs": [
+          "recipes/glibc.srx",
+          "recipes/glibc_source.srx"
+        ]
+      },
+      "inputs": {
+        "@signing-authority": "b532389ef83330dcaea7a24f530ffcf315612da98cd328e2072ddf221962fa04",
+        "keys/hello.asc": "ff29837038738302c5a6357c1184648e99688944e6c75aa0f306a0b657ea9ba0",
+        "recipes/contracts_hello.srx": "7cce11f625331d256c1da710d36d675eb51a8160f1a1f04e750dee01f1fa81ca",
+        "recipes/glibc.srx": "63e6e4fe5f356699fd1922738a0ab7f30635eb93bf4fca9acb87af168586cbb5",
+        "recipes/glibc_source.srx": "9db5d82da9055128f119ccee522291e6eeaf2cd3a1f4b037ce1364d1a16dc88e",
+        "recipes/versioned_hello_2_12_1_gnu.srx": "8249b9ae17c081b417be5e08d165952b9fb040d1273500494711b0aa7be79a76",
+        "recipes/versioned_hello_source_2_12_1.srx": "486840a29950f7dc4fee235af5f0a3c2f57c621751f1e1f2089b873ed668ff8b",
+        "toolchains/linux-x86_64-gnu.toml": "7891b6e663886a3d008d477ec95893160a5b537fb9321cff88846c3bcc5d5c45"
+      },
+      "identity": "d18e503eaedafcd504c697f85bc30bdb73c121490ba77a277d3015d0589ee18e"
+    },
+    {
+      "package": {
+        "name": "nginx",
+        "version": "1.30.5",
+        "variant": "minimal",
+        "system": "linux-x86_64-gnu",
+        "source_url": "https://nginx.org/download/nginx-1.30.5.tar.gz",
+        "source_sha256": "6c20565aa2325cb82216ae804f4a4ff1875179014759a381c42ddc8e11c4906d",
+        "source_maximum_bytes": 2097152,
+        "signature_url": "https://nginx.org/download/nginx-1.30.5.tar.gz.asc",
+        "recipe": "recipes/versioned_nginx_1_30_5_gnu.srx",
+        "factory": "nginx",
+        "export": "versioned_nginx_1_30_5_gnu",
+        "source": "recipes/versioned_nginx_source_1_30_5.srx",
+        "contract": "recipes/contracts_nginx.srx",
+        "contract_type": "Settings",
+        "toolchain": "toolchains/linux-x86_64-gnu.toml",
         "recipe_inputs": []
       },
       "inputs": {
@@ -641,6 +851,38 @@
         "toolchains/linux-x86_64-musl.toml": "de4057063129fb8fb74235dc406bf2e965fd29a7ae270c2c1cfff9b2cc591a68"
       },
       "identity": "e2ccebdc6c1e36ee072cc8f69aadca3b7e7f7b12475295b2d185de048f9fb5c9"
+    },
+    {
+      "package": {
+        "name": "nginx",
+        "version": "1.30.6",
+        "variant": "minimal",
+        "system": "linux-x86_64-musl",
+        "source_url": "https://nginx.org/download/nginx-1.30.6.tar.gz",
+        "source_sha256": "3cf46f5ed7504d460125866b7bea99fb357f31d887e2e63b35503310e9b8b6c8",
+        "source_maximum_bytes": 2097152,
+        "signature_url": "https://nginx.org/download/nginx-1.30.6.tar.gz.asc",
+        "recipe": "recipes/versioned_nginx_1_30_6_musl.srx",
+        "factory": "nginx",
+        "export": "versioned_nginx_1_30_6_musl",
+        "source": "recipes/versioned_nginx_source_1_30_6.srx",
+        "contract": "recipes/contracts_nginx.srx",
+        "contract_type": "Settings",
+        "toolchain": "toolchains/linux-x86_64-musl.toml",
+        "recipe_inputs": [
+          "recipes/nginx_version_build.srx"
+        ]
+      },
+      "inputs": {
+        "@signing-authority": "de1c283af877f6341ec2e1de9fd7f690d18732f5657b6c5a0aaa5275c7a10d16",
+        "keys/nginx.asc": "9a70c136946c1d18d5355c41516f1bdc95d4321938919e69065533e2aeb51e0e",
+        "recipes/contracts_nginx.srx": "b6c694abe5f27d3c19d75885d78ecad207037104831b4ca3a14ce370dbd792c6",
+        "recipes/nginx_version_build.srx": "4bb3c78ba7b6c2ca03c6cf9e496e6a4b593a22c2cd8cca35bc85672dc2939e38",
+        "recipes/versioned_nginx_1_30_6_musl.srx": "6202392062d9bb0672c4aeb9663ce7fc143cb9cb80d5e7bb953c09fd0c0f500d",
+        "recipes/versioned_nginx_source_1_30_6.srx": "ac81a6d0e0dec522220a9785d2db72ab330feba6a13007f9ee38db123302338a",
+        "toolchains/linux-x86_64-musl.toml": "de4057063129fb8fb74235dc406bf2e965fd29a7ae270c2c1cfff9b2cc591a68"
+      },
+      "identity": "eb557596cc311e37a87e6ef58a02a2981d061718edc51016a1d4e70a961ae659"
     },
     {
       "package": {

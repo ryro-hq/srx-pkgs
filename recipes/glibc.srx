@@ -21,9 +21,10 @@ fn build(options: std::BuildOptions) -> std::Build {
             std::BuildStep::Extract(std::BuildPath::Work("source")),
             std::BuildStep::Directory(cwd),
             std::BuildStep::Run(std::BuildProcess { executable = std::BuildPath::Host("/bin/sh"); directory = cwd;
+                environment = [std::BuildEnv { name = "AWK"; text = std::build_path(std::BuildPath::Host("/usr/bin/gawk")); }];
                 arguments = [std::build_path(std::BuildPath::Work("source/${options.source_directory}/configure")), std::build_join([std::BuildPart::Literal("--prefix="), std::BuildPart::Path(std::BuildPath::Installed("out", "usr"))]), std::build_text("--disable-werror")]; }),
-            std::BuildStep::Run(std::BuildProcess { executable = std::BuildPath::Host("/usr/bin/make"); directory = cwd; arguments = [std::build_text("-j2")]; }),
-            std::BuildStep::Run(std::BuildProcess { executable = std::BuildPath::Host("/usr/bin/make"); directory = cwd; arguments = [std::build_text("install"), std::build_text("DESTDIR=/out")]; }),
+            std::BuildStep::Run(std::BuildProcess { executable = std::BuildPath::Host("/usr/bin/make"); directory = cwd; arguments = [std::build_text("-j2")]; environment = [std::BuildEnv { name = "AWK"; text = std::build_path(std::BuildPath::Host("/usr/bin/gawk")); }]; }),
+            std::BuildStep::Run(std::BuildProcess { executable = std::BuildPath::Host("/usr/bin/make"); directory = cwd; arguments = [std::build_text("install"), std::build_text("DESTDIR=/out")]; environment = [std::BuildEnv { name = "AWK"; text = std::build_path(std::BuildPath::Host("/usr/bin/gawk")); }]; }),
             std::BuildStep::Directory(std::BuildPath::Output("out", "usr/lib/locale")),
             std::BuildStep::Run(std::BuildProcess { executable = std::BuildPath::Output("out", "usr/lib/ld-linux-x86-64.so.2"); directory = cwd;
                 arguments = [std::build_text("--library-path"), std::build_path(std::BuildPath::Output("out", "usr/lib")), std::build_path(std::BuildPath::Output("out", "usr/bin/localedef")), std::build_text("--no-archive"), std::build_text("-i"), std::build_text("C"), std::build_text("-f"), std::build_text("UTF-8"), std::build_path(std::BuildPath::Output("out", "usr/lib/locale/C.utf8"))];

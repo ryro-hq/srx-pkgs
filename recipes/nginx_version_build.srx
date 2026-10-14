@@ -18,7 +18,7 @@ pub fn build(directory: std::SourceDirectory, compiler: std::BuildText, environm
                     std::build_text("--without-http_rewrite_module"), std::build_text("--without-pcre"),
                     std::build_text("--without-http_gzip_module"), std::build_text("--without-http_auth_basic_module"),
                     std::build_text("--without-http-cache"), std::build_text("--error-log-path=stderr"),
-                    std::build_text("--http-log-path=/dev/stdout"), std::build_text("--pid-path=/tmp/nginx.pid"),
+                    std::build_text("--http-log-path=/tmp/nginx-access.log"), std::build_text("--pid-path=/tmp/nginx.pid"),
                     std::build_text("--lock-path=/tmp/nginx.lock"), std::build_text("--http-client-body-temp-path=/tmp/client-body"),
                     std::build_text("--http-proxy-temp-path=/tmp/proxy"), std::build_text("--http-fastcgi-temp-path=/tmp/fastcgi"),
                     std::build_text("--http-uwsgi-temp-path=/tmp/uwsgi"), std::build_text("--http-scgi-temp-path=/tmp/scgi")

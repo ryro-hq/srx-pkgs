@@ -1,5 +1,5 @@
 pub fn nginx() -> std::PackageRef<contracts_nginx::Settings> package("nginx", "1.30.5", "minimal", "linux-x86_64-musl") {
-    std::with_package_service(std::package_ref(std::recipe_ref(raw_recipe), "1.30.5", "minimal", "linux-x86_64-musl", "b6c694abe5f27d3c19d75885d78ecad207037104831b4ca3a14ce370dbd792c6", contracts_nginx::render), project::nginx_validated)
+    std::with_package_service(std::package_ref(std::recipe_ref(raw_recipe), "1.30.5", "minimal", "linux-x86_64-musl", "6fdaea8e0648f7913cf5ce418df0066baac3d6d23d274de0d0c094c79ea4e61e", contracts_nginx::render), project::nginx_validated)
 }
 
 pub fn recipe() -> std::Recipe { std::recipe_value(std::package_recipe(nginx())) }

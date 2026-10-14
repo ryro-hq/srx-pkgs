@@ -59,6 +59,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/core
+      - name: Admit KVM for environment preparation
+        run: |
+          test -c /dev/kvm
+          sudo chown "$(id -u):$(id -g)" /dev/kvm
+          sudo chmod 660 /dev/kvm
       - uses: actions/cache/restore@v6
         id: vm-cache
         with:
