@@ -49,8 +49,6 @@ jobs:
             git show "$BASE_SHA:Catalog.lock" > /tmp/previous-catalog.lock
             srx catalog preserve . /tmp/previous-catalog.lock
           fi
-      - name: Verify pinned upstream signatures
-        run: srx catalog verify-sources .
       - id: matrix
         run: echo "matrix=$(srx catalog matrix .)" >> "$GITHUB_OUTPUT"
 

@@ -18,8 +18,13 @@ jobs:
         with:
           fetch-depth: 0
       - uses: ./.github/actions/core
+      - name: Prepare isolated native maintenance tools
+        run: docker build -f .github/maintenance.Containerfile -t syrox-maintenance:ci .github
       - name: Discover stable releases through fixed official origins
-        run: srx catalog updates . > /tmp/syrox-updates.json
+        run: |
+          docker run --rm --user "$(id -u):$(id -g)" --dns-option single-request \
+            --mount "type=bind,src=$PWD,dst=/catalog,readonly" \
+            syrox-maintenance:ci /catalog/.core/target/catalog-candidate/srx catalog updates /catalog > /tmp/syrox-updates.json
       - name: Add signed versions and request checks against each exact PR SHA
         env:
           GH_TOKEN: ${{ secrets.SYROX_UPDATES_TOKEN }}
@@ -37,7 +42,9 @@ jobs:
             fi
             git switch --detach origin/main
             git switch -c "$branch"
-            srx catalog add . "$name" "$version"
+            docker run --rm --user "$(id -u):$(id -g)" --dns-option single-request \
+              --mount "type=bind,src=$PWD,dst=/catalog" \
+              syrox-maintenance:ci /catalog/.core/target/catalog-candidate/srx catalog add /catalog "$name" "$version"
             srx catalog lock . --check
             srx catalog matrix . > /tmp/syrox-new-matrix.json
             git add catalog.toml Catalog.lock Syrox.lock recipes changes
