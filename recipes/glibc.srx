@@ -21,7 +21,7 @@ fn build(options: std::BuildOptions) -> std::Build {
             std::BuildStep::Extract(std::BuildPath::Work("source")),
             std::BuildStep::Directory(cwd),
             std::BuildStep::Run(std::BuildProcess { executable = std::BuildPath::Host("/bin/sh"); directory = cwd;
-                environment = [std::BuildEnv { name = "AWK"; text = std::build_path(std::BuildPath::Host("/usr/bin/gawk")); }];
+                environment = [std::BuildEnv { name = "AWK"; text = std::build_path(std::BuildPath::Host("/usr/bin/gawk")); }, std::BuildEnv { name = "CFLAGS"; text = std::build_text("-O2 -g0"); }];
                 arguments = [std::build_path(std::BuildPath::Work("source/${options.source_directory}/configure")), std::build_join([std::BuildPart::Literal("--prefix="), std::BuildPart::Path(std::BuildPath::Installed("out", "usr"))]), std::build_text("--disable-werror")]; }),
             std::BuildStep::Run(std::BuildProcess { executable = std::BuildPath::Host("/usr/bin/make"); directory = cwd; arguments = [std::build_text("-j2")]; environment = [std::BuildEnv { name = "AWK"; text = std::build_path(std::BuildPath::Host("/usr/bin/gawk")); }]; }),
             std::BuildStep::Run(std::BuildProcess { executable = std::BuildPath::Host("/usr/bin/make"); directory = cwd; arguments = [std::build_text("install"), std::build_text("DESTDIR=/out")]; environment = [std::BuildEnv { name = "AWK"; text = std::build_path(std::BuildPath::Host("/usr/bin/gawk")); }]; }),
