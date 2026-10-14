@@ -4,6 +4,13 @@ pub fn build(directory: std::SourceDirectory, compiler: std::BuildText, environm
         profile = std::BuildProfile::HostBootstrap;
         source_directory = directory; timeout_seconds = 600;
         steps = [std::BuildStep::Extract(std::BuildPath::Work("source"))] ++ before ++ [
+            // The runtime has already dropped capabilities and maps its owner
+            // to namespace UID 0. nginx must retain that owner, as it does for
+            // ordinary non-root execution, without consulting host passwd data.
+            std::BuildStep::Run(std::BuildProcess {
+                executable = std::BuildPath::Host("/bin/sh"); directory = cwd;
+                arguments = [std::build_text("-eu"), std::build_text("-c"), std::build_text("grep -Fq 'geteuid() == 0' src/core/nginx.c\ngrep -Fq 'geteuid() != 0' src/core/nginx.c\ngrep -Fq 'geteuid() == 0' src/os/unix/ngx_process_cycle.c\nsed -i 's/geteuid() == 0/0/g; s/geteuid() != 0/1/g' src/core/nginx.c src/os/unix/ngx_process_cycle.c\n")];
+            }),
             std::BuildStep::Run(std::BuildProcess {
                 executable = std::BuildPath::Host("/bin/sh"); directory = cwd; environment = environment;
                 arguments = [std::build_text("configure"), compiler,
