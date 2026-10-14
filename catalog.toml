@@ -1,0 +1,132 @@
+schema = 1
+[defaults]
+nginx = "1.30.5"
+hello = "2.12.1"
+
+[[channels]]
+name = "nginx"
+releases = "https://nginx.org/en/download.html"
+origin = "https://nginx.org/"
+archive_prefix = "nginx-"
+archive_suffix = ".tar.gz"
+release_policy = "even-minor"
+signing_key = "D6786CE303D9A9022998DC6CC8464D549AF75C0A"
+key_file = "keys/nginx.asc"
+
+[[channels]]
+name = "hello"
+releases = "https://ftp.gnu.org/gnu/hello/"
+origin = "https://ftp.gnu.org/"
+archive_prefix = "hello-"
+archive_suffix = ".tar.gz"
+release_policy = "numeric"
+signing_key = "24093F016FFE8602EF449BB84C8EF3DA3FD37230"
+key_file = "keys/hello.asc"
+
+[[packages]]
+name = "nginx"
+version = "1.30.5"
+variant = "minimal"
+system = "linux-x86_64-gnu"
+source_url = "https://nginx.org/download/nginx-1.30.5.tar.gz"
+source_sha256 = "6c20565aa2325cb82216ae804f4a4ff1875179014759a381c42ddc8e11c4906d"
+source_maximum_bytes = 2097152
+signature_url = "https://nginx.org/download/nginx-1.30.5.tar.gz.asc"
+recipe = "recipes/versioned_nginx_1_30_5_gnu.srx"
+factory = "nginx"
+export = "versioned_nginx_1_30_5_gnu"
+source = "recipes/versioned_nginx_source_1_30_5.srx"
+contract = "recipes/contracts_nginx.srx"
+contract_type = "Settings"
+toolchain = "toolchains/linux-x86_64-gnu.toml"
+
+recipe_inputs = ["recipes/nginx_version_build.srx", "recipes/glibc.srx", "recipes/glibc_source.srx"]
+[[packages]]
+name = "nginx"
+version = "1.30.5"
+variant = "minimal"
+system = "linux-x86_64-musl"
+source_url = "https://nginx.org/download/nginx-1.30.5.tar.gz"
+source_sha256 = "6c20565aa2325cb82216ae804f4a4ff1875179014759a381c42ddc8e11c4906d"
+source_maximum_bytes = 2097152
+signature_url = "https://nginx.org/download/nginx-1.30.5.tar.gz.asc"
+recipe = "recipes/versioned_nginx_1_30_5_musl.srx"
+factory = "nginx"
+export = "versioned_nginx_1_30_5_musl"
+source = "recipes/versioned_nginx_source_1_30_5.srx"
+contract = "recipes/contracts_nginx.srx"
+contract_type = "Settings"
+toolchain = "toolchains/linux-x86_64-musl.toml"
+
+recipe_inputs = ["recipes/nginx_version_build.srx"]
+[[packages]]
+name = "nginx"
+version = "1.30.6"
+variant = "minimal"
+system = "linux-x86_64-gnu"
+source_url = "https://nginx.org/download/nginx-1.30.6.tar.gz"
+source_sha256 = "3cf46f5ed7504d460125866b7bea99fb357f31d887e2e63b35503310e9b8b6c8"
+source_maximum_bytes = 2097152
+signature_url = "https://nginx.org/download/nginx-1.30.6.tar.gz.asc"
+recipe = "recipes/versioned_nginx_1_30_6_gnu.srx"
+factory = "nginx"
+export = "versioned_nginx_1_30_6_gnu"
+source = "recipes/versioned_nginx_source_1_30_6.srx"
+contract = "recipes/contracts_nginx.srx"
+contract_type = "Settings"
+toolchain = "toolchains/linux-x86_64-gnu.toml"
+
+recipe_inputs = ["recipes/nginx_version_build.srx", "recipes/glibc.srx", "recipes/glibc_source.srx"]
+[[packages]]
+name = "nginx"
+version = "1.30.6"
+variant = "minimal"
+system = "linux-x86_64-musl"
+source_url = "https://nginx.org/download/nginx-1.30.6.tar.gz"
+source_sha256 = "3cf46f5ed7504d460125866b7bea99fb357f31d887e2e63b35503310e9b8b6c8"
+source_maximum_bytes = 2097152
+signature_url = "https://nginx.org/download/nginx-1.30.6.tar.gz.asc"
+recipe = "recipes/versioned_nginx_1_30_6_musl.srx"
+factory = "nginx"
+export = "versioned_nginx_1_30_6_musl"
+source = "recipes/versioned_nginx_source_1_30_6.srx"
+contract = "recipes/contracts_nginx.srx"
+contract_type = "Settings"
+toolchain = "toolchains/linux-x86_64-musl.toml"
+
+recipe_inputs = ["recipes/nginx_version_build.srx"]
+[[packages]]
+name = "hello"
+version = "2.12.1"
+variant = "default"
+system = "linux-x86_64-gnu"
+source_url = "https://ftp.gnu.org/gnu/hello/hello-2.12.1.tar.gz"
+source_sha256 = "8d99142afd92576f30b0cd7cb42a8dc6809998bc5d607d88761f512e26c7db20"
+source_maximum_bytes = 2097152
+signature_url = "https://ftp.gnu.org/gnu/hello/hello-2.12.1.tar.gz.sig"
+recipe = "recipes/versioned_hello_2_12_1_gnu.srx"
+factory = "hello_version"
+export = "versioned_hello_2_12_1_gnu"
+source = "recipes/versioned_hello_source_2_12_1.srx"
+contract = "recipes/contracts_hello.srx"
+contract_type = "Settings"
+toolchain = "toolchains/linux-x86_64-gnu.toml"
+
+recipe_inputs = ["recipes/glibc.srx", "recipes/glibc_source.srx"]
+[[packages]]
+name = "hello"
+version = "2.12.1"
+variant = "default"
+system = "linux-x86_64-musl"
+source_url = "https://ftp.gnu.org/gnu/hello/hello-2.12.1.tar.gz"
+source_sha256 = "8d99142afd92576f30b0cd7cb42a8dc6809998bc5d607d88761f512e26c7db20"
+source_maximum_bytes = 2097152
+signature_url = "https://ftp.gnu.org/gnu/hello/hello-2.12.1.tar.gz.sig"
+recipe = "recipes/versioned_hello_2_12_1_musl.srx"
+factory = "hello_version"
+export = "versioned_hello_2_12_1_musl"
+source = "recipes/versioned_hello_source_2_12_1.srx"
+contract = "recipes/contracts_hello.srx"
+contract_type = "Settings"
+toolchain = "toolchains/linux-x86_64-musl.toml"
+recipe_inputs = ["recipes/hello_musl_build.srx"]

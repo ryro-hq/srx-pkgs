@@ -1,0 +1,80 @@
+// Experimental native Linux x86_64 factory; requires MANAGED.txt's seed contract.
+// Minimal HTTP: no TLS, regular-expression rewrite, gzip or libcrypt dependency.
+pub fn managed_nginx(seed: toolchain::Toolchain, libc: std::RecipeRef<std::Recipe>) -> std::Recipe {
+    std::Recipe {
+        package = std::Package { id = "nginx-minimal"; dependencies = []; };
+        acquisition = std::Option::Some(std::Acquisition { sources = [std::source_request(
+            "https://nginx.org/download/nginx-1.30.5.tar.gz",
+            "6c20565aa2325cb82216ae804f4a4ff1875179014759a381c42ddc8e11c4906d", 2097152
+        )]; });
+        build_inputs = std::Option::Some(std::BuildInputs { selected = toolchain::select_inputs(seed) ++ [
+            std::recipe_output(libc, "dev"), std::recipe_output(libc, "out")
+        ]; });
+        build = std::Option::Some(program());
+        commands = [std::Command {
+            name = "nginx"; output = "out"; path = "usr/bin/nginx";
+            loader = [std::RuntimeFile { output = std::recipe_output(libc, "out"); path = "usr/lib/ld-linux-x86-64.so.2"; }];
+            libraries = [std::recipe_output(libc, "out")];
+        }];
+    }
+}
+
+fn program() -> std::Build {
+    let cwd = std::BuildPath::Work("source/nginx-1.30.5");
+    std::Build {
+        profile = std::BuildProfile::Managed;
+        source_directory = "nginx-1.30.5"; timeout_seconds = 600;
+        steps = [
+            std::BuildStep::Extract(std::BuildPath::Work("source")),
+            std::BuildStep::Run(std::BuildProcess {
+                executable = std::BuildPath::Input(4, "usr/bin/sh"); directory = cwd; environment = environment();
+                arguments = [std::build_text("configure"),
+                    std::build_join([std::BuildPart::Literal("--with-cc="), std::BuildPart::Path(std::BuildPath::Input(0, "usr/bin/cc"))]),
+                    std::BuildText { parts = [std::BuildPart::Literal("--with-cc-opt=")] ++ c_flags().parts; },
+                    std::BuildText { parts = [std::BuildPart::Literal("--with-ld-opt=")] ++ linker_flags().parts; },
+                    std::build_join([std::BuildPart::Literal("--prefix="), std::BuildPart::Path(std::BuildPath::Installed("out", "usr"))]),
+                    std::build_text("--without-http_rewrite_module"), std::build_text("--without-pcre"),
+                    std::build_text("--without-http_gzip_module"), std::build_text("--without-http_auth_basic_module"),
+                    std::build_text("--without-http-cache"), std::build_text("--error-log-path=stderr"),
+                    std::build_text("--http-log-path=/dev/stdout"), std::build_text("--pid-path=/tmp/nginx.pid"),
+                    std::build_text("--lock-path=/tmp/nginx.lock"), std::build_text("--http-client-body-temp-path=/tmp/client-body"),
+                    std::build_text("--http-proxy-temp-path=/tmp/proxy"), std::build_text("--http-fastcgi-temp-path=/tmp/fastcgi"),
+                    std::build_text("--http-uwsgi-temp-path=/tmp/uwsgi"), std::build_text("--http-scgi-temp-path=/tmp/scgi")
+                ];
+            }),
+            std::BuildStep::Run(std::BuildProcess {
+                executable = std::BuildPath::Input(4, "usr/bin/make"); directory = cwd; environment = environment();
+                arguments = [std::build_text("-j2"), std::build_join([std::BuildPart::Literal("SHELL="), std::BuildPart::Path(std::BuildPath::Input(4, "usr/bin/sh"))])];
+            }),
+            std::BuildStep::Directory(std::BuildPath::Output("out", "usr/bin")),
+            std::BuildStep::Copy(std::BuildPath::Work("source/nginx-1.30.5/objs/nginx"), std::BuildPath::Output("out", "usr/bin/nginx")),
+        ];
+    }
+}
+
+fn c_flags() -> std::BuildText {
+    std::build_join([
+        std::BuildPart::Literal("-O2 -nostdinc -isystem "), std::BuildPart::Path(std::BuildPath::Input(0, "usr/lib/gcc/x86_64-pc-linux-gnu/16/include")),
+        std::BuildPart::Literal(" -isystem "), std::BuildPart::Path(std::BuildPath::Input(5, "usr/include")),
+        std::BuildPart::Literal(" -isystem "), std::BuildPart::Path(std::BuildPath::Input(3, "usr/include")),
+        std::BuildPart::Literal(" -B"), std::BuildPart::Path(std::BuildPath::Input(5, "usr/lib")), std::BuildPart::Literal("/"),
+    ])
+}
+
+fn linker_flags() -> std::BuildText {
+    std::build_join([
+        std::BuildPart::Literal("-L"), std::BuildPart::Path(std::BuildPath::Input(6, "usr/lib")),
+        std::BuildPart::Literal(" -Wl,--dynamic-linker="), std::BuildPart::Path(std::BuildPath::Input(6, "usr/lib/ld-linux-x86-64.so.2")),
+        std::BuildPart::Literal(" -Wl,--enable-new-dtags,-rpath,"), std::BuildPart::Path(std::BuildPath::Input(6, "usr/lib")),
+    ])
+}
+
+fn environment() -> [std::BuildEnv] {
+    toolchain::compiler_environment() ++ [
+        std::BuildEnv { name = "PATH"; text = toolchain::search_path(); },
+        std::BuildEnv { name = "SHELL"; text = std::build_path(std::BuildPath::Input(4, "usr/bin/sh")); },
+        std::BuildEnv { name = "LC_ALL"; text = std::build_text("C"); },
+        std::BuildEnv { name = "SYROX_BUILD_SHELL"; text = std::build_path(std::BuildPath::Input(4, "usr/bin/sh")); },
+    ]
+}
+

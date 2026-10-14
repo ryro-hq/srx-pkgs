@@ -1,101 +1,37 @@
 // Package identity, pinned acquisition and the bounded build are separate values.
-fn hello() -> std::Package {
+fn hello_package() -> std::Package {
     std::Package { id = "hello"; dependencies = []; }
 }
 
-fn hello_sources() -> std::Acquisition {
-    std::Acquisition {
-        package = "hello";
-        sources = [std::SourceRequest {
-            url = "https://ftp.gnu.org/gnu/hello/hello-2.12.1.tar.gz";
-            sha256 = "8d99142afd92576f30b0cd7cb42a8dc6809998bc5d607d88761f512e26c7db20";
-            maximum_bytes = 2097152;
-        }];
-    }
-}
+fn hello_sources() -> std::Acquisition { hello_source::acquisition() }
 
-fn hello_build() -> std::AutotoolsBuild {
-    std::AutotoolsBuild {
-        package = "hello";
+fn hello_build() -> std::Build {
+    std::autotools_with_libc(std::BuildOptions {
         source_directory = "hello-2.12.1";
-        entry = "usr/bin/hello";
         timeout_seconds = 120;
-    }
+    })
 }
 
 fn hello_build_inputs() -> std::BuildInputs {
     std::BuildInputs {
-        package = "hello";
-        selected = [std::BuildOutput { package = "glibc"; output = "dev"; }];
+        selected = [std::recipe_output(project::glibc, "dev"), std::recipe_output(project::glibc, "out")];
     }
 }
 
-fn bootstrap() -> std::Package {
-    std::Package { id = "bootstrap-glibc"; dependencies = []; }
-}
-
-fn bootstrap_sources() -> std::Acquisition {
-    std::Acquisition {
-        package = "bootstrap-glibc";
-        sources = [std::SourceRequest {
-            url = "project:assets/bootstrap-glibc-host-x86_64.tar.gz";
-            sha256 = "09bede497713ef311ca7e35a24942b67faaf2beaa879c74d39b4e48defdb4941";
-            maximum_bytes = 2097152;
-        }];
+fn hello_command() -> std::Command {
+    std::Command {
+        name = "hello"; output = "out"; path = "usr/bin/hello";
+        loader = [std::RuntimeFile { output = std::recipe_output(project::glibc, "out"); path = "usr/lib/ld-linux-x86-64.so.2"; }];
+        libraries = [std::recipe_output(project::glibc, "out")];
     }
 }
 
-fn bootstrap_build() -> std::AutotoolsBuild {
-    std::AutotoolsBuild {
-        package = "bootstrap-glibc";
-        source_directory = "bootstrap-glibc-1";
-        entry = "usr/lib/ld-linux-x86-64.so.2";
-        timeout_seconds = 60;
+pub fn recipe() -> std::Recipe {
+    std::Recipe {
+        package = hello_package();
+        acquisition = std::Option::Some(hello_sources());
+        build = std::Option::Some(hello_build());
+        build_inputs = std::Option::Some(hello_build_inputs());
+        commands = [hello_command()];
     }
-}
-
-fn glibc() -> std::Package {
-    std::Package { id = "glibc"; dependencies = []; }
-}
-
-fn glibc_sources() -> std::Acquisition {
-    std::Acquisition {
-        package = "glibc";
-        sources = [std::SourceRequest {
-            url = "https://ftp.gnu.org/gnu/glibc/glibc-2.44.tar.xz";
-            sha256 = "37f600f2bef3c5e8300147059568b2a2e40a7ad6ccc65ce942556d49429cc667";
-            maximum_bytes = 33554432;
-        }];
-    }
-}
-
-fn glibc_build() -> std::GlibcBuild {
-    std::GlibcBuild {
-        package = "glibc";
-        source_directory = "glibc-2.44";
-        entry = "usr/lib/ld-linux-x86-64.so.2";
-        timeout_seconds = 1800;
-    }
-}
-
-fn hello_application() -> std::Application {
-    std::Application {
-        package = "hello";
-        loader = [std::RuntimeLoader { package = "glibc"; }];
-        libraries = [std::RuntimeLibrary { package = "glibc"; }];
-    }
-}
-
-outputs {
-    hello: fn() -> std::Package = hello;
-    hello_sources: fn() -> std::Acquisition = hello_sources;
-    hello_build: fn() -> std::AutotoolsBuild = hello_build;
-    hello_build_inputs: fn() -> std::BuildInputs = hello_build_inputs;
-    bootstrap: fn() -> std::Package = bootstrap;
-    bootstrap_sources: fn() -> std::Acquisition = bootstrap_sources;
-    bootstrap_build: fn() -> std::AutotoolsBuild = bootstrap_build;
-    glibc: fn() -> std::Package = glibc;
-    glibc_sources: fn() -> std::Acquisition = glibc_sources;
-    glibc_build: fn() -> std::GlibcBuild = glibc_build;
-    hello_application: fn() -> std::Application = hello_application;
 }

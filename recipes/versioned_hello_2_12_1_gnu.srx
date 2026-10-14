@@ -1,0 +1,17 @@
+pub fn hello_version() -> std::PackageRef<contracts_hello::Settings> package("hello", "2.12.1", "default", "linux-x86_64-gnu") {
+    std::package_ref(std::recipe_ref(raw_recipe), "2.12.1", "default", "linux-x86_64-gnu", "7cce11f625331d256c1da710d36d675eb51a8160f1a1f04e750dee01f1fa81ca", contracts_hello::render)
+}
+
+pub fn recipe() -> std::Recipe { std::recipe_value(std::package_recipe(hello_version())) }
+
+fn raw_recipe() -> std::Recipe {
+    std::Recipe {
+        package = std::Package { id = "hello"; dependencies = []; };
+        acquisition = std::Option::Some(versioned_hello_source_2_12_1::acquisition());
+        build = std::Option::Some(std::autotools_with_libc(std::BuildOptions { source_directory = "hello-2.12.1"; timeout_seconds = 180; }));
+        build_inputs = std::Option::Some(std::BuildInputs { selected = [std::recipe_output(project::glibc, "dev"), std::recipe_output(project::glibc, "out")]; });
+        commands = [std::Command { name = "hello"; output = "out"; path = "usr/bin/hello";
+            loader = [std::RuntimeFile { output = std::recipe_output(project::glibc, "out"); path = "usr/lib/ld-linux-x86-64.so.2"; }];
+            libraries = [std::recipe_output(project::glibc, "out")]; }];
+    }
+}

@@ -1,0 +1,71 @@
+// Fixed slots: compiler0/python1/runtime2/sysroot3/tools4, libc/dev5 and libc/out6.
+// The compiler must resolve its own helpers/libgcc from the admitted seed.
+pub fn c_flags() -> std::BuildText {
+    std::build_join([
+        std::BuildPart::Literal("-O2 -nostdinc -isystem "), std::BuildPart::Path(std::BuildPath::Input(0, "usr/lib/gcc/x86_64-pc-linux-gnu/16/include")),
+        std::BuildPart::Literal(" -isystem "), std::BuildPart::Path(std::BuildPath::Input(5, "usr/include")),
+        std::BuildPart::Literal(" -isystem "), std::BuildPart::Path(std::BuildPath::Input(3, "usr/include")),
+        std::BuildPart::Literal(" -B"), std::BuildPart::Path(std::BuildPath::Input(5, "usr/lib")), std::BuildPart::Literal("/"),
+    ])
+}
+
+pub fn linker_flags() -> std::BuildText {
+    std::build_join([
+        std::BuildPart::Literal("-L"), std::BuildPart::Path(std::BuildPath::Input(6, "usr/lib")),
+        std::BuildPart::Literal(" -Wl,--dynamic-linker="), std::BuildPart::Path(std::BuildPath::Input(6, "usr/lib/ld-linux-x86-64.so.2")),
+        std::BuildPart::Literal(" -Wl,--enable-new-dtags,-rpath,"), std::BuildPart::Path(std::BuildPath::Input(6, "usr/lib")),
+    ])
+}
+
+pub fn environment() -> [std::BuildEnv] {
+    toolchain::compiler_environment() ++ [
+        std::BuildEnv { name = "PATH"; text = toolchain::search_path(); },
+        std::BuildEnv { name = "SHELL"; text = std::build_path(std::BuildPath::Input(4, "usr/bin/sh")); },
+        std::BuildEnv { name = "CONFIG_SHELL"; text = std::build_path(std::BuildPath::Input(4, "usr/bin/sh")); },
+        std::BuildEnv { name = "CC"; text = std::build_path(std::BuildPath::Input(0, "usr/bin/cc")); },
+        std::BuildEnv { name = "AR"; text = std::build_path(std::BuildPath::Input(4, "usr/bin/ar")); },
+        std::BuildEnv { name = "RANLIB"; text = std::build_path(std::BuildPath::Input(4, "usr/bin/ranlib")); },
+        std::BuildEnv { name = "CFLAGS"; text = c_flags(); },
+        std::BuildEnv { name = "LDFLAGS"; text = linker_flags(); },
+        std::BuildEnv { name = "LC_ALL"; text = std::build_text("C"); },
+    ]
+}
+
+pub fn autotools(options: std::BuildOptions) -> std::Build {
+    let cwd = std::BuildPath::Work("source/${options.source_directory}");
+    let shell = std::build_join([std::BuildPart::Literal("SHELL="), std::BuildPart::Path(std::BuildPath::Input(4, "usr/bin/sh"))]);
+    std::Build {
+        profile = std::BuildProfile::Managed;
+        source_directory = options.source_directory; timeout_seconds = options.timeout_seconds;
+        steps = [
+            std::BuildStep::Extract(std::BuildPath::Work("source")),
+            std::BuildStep::Run(std::BuildProcess {
+                executable = std::BuildPath::Input(4, "usr/bin/sh"); directory = cwd;
+                environment = environment() ++ [
+                    // Hello's configure falls back to executing install-sh without SHELL.
+                    std::BuildEnv { name = "INSTALL"; text = std::build_join([
+                        std::BuildPart::Path(std::BuildPath::Input(4, "usr/bin/sh")), std::BuildPart::Literal(" "),
+                        std::BuildPart::Path(std::BuildPath::Work("source/${options.source_directory}/build-aux/install-sh")), std::BuildPart::Literal(" -c")]); },
+                    std::BuildEnv { name = "MKDIR_P"; text = std::build_join([
+                        std::BuildPart::Path(std::BuildPath::Input(4, "usr/bin/mkdir")), std::BuildPart::Literal(" -p")]); },
+                    // AC_PROG_MAKE_SET writes SHELL=/bin/sh into conftest.make.
+                    std::BuildEnv { name = "MAKE"; text = std::build_join([
+                        std::BuildPart::Path(std::BuildPath::Input(4, "usr/bin/make")), std::BuildPart::Literal(" SHELL="),
+                        std::BuildPart::Path(std::BuildPath::Input(4, "usr/bin/sh"))]); },
+                ];
+                arguments = [std::build_text("./configure"),
+                    std::build_join([std::BuildPart::Literal("--prefix="), std::BuildPart::Path(std::BuildPath::Installed("out", "usr"))]),
+                    std::build_text("--disable-nls")];
+            }),
+            std::BuildStep::Run(std::BuildProcess {
+                executable = std::BuildPath::Input(4, "usr/bin/make"); directory = cwd;
+                environment = environment(); arguments = [std::build_text("-j2"), shell];
+            }),
+            std::BuildStep::Run(std::BuildProcess {
+                executable = std::BuildPath::Input(4, "usr/bin/make"); directory = cwd;
+                environment = environment();
+                arguments = [std::build_text("install"), std::build_text("DESTDIR=/out"), shell];
+            }),
+        ];
+    }
+}

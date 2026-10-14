@@ -1,18 +1,16 @@
-// Catalog smoke project: an authenticated local input exports pure factories.
-inputs { catalog = "path:recipes"; }
+inputs { catalog = "modules:recipes"; integrations = "modules:integrations"; }
 
-outputs {
-    hello: std::Package = catalog::hello();
-    hello_sources: std::Acquisition = catalog::hello_sources();
-    hello_build: std::AutotoolsBuild = catalog::hello_build();
-    hello_build_inputs: std::BuildInputs = catalog::hello_build_inputs();
-    bootstrap: std::Package = catalog::bootstrap();
-    bootstrap_sources: std::Acquisition = catalog::bootstrap_sources();
-    bootstrap_build: std::AutotoolsBuild = catalog::bootstrap_build();
-    glibc: std::Package = catalog::glibc();
-    glibc_sources: std::Acquisition = catalog::glibc_sources();
-    glibc_build: std::GlibcBuild = catalog::glibc_build();
-    hello_application: std::Application = catalog::hello_application();
-    default_application: std::DefaultApplication = std::DefaultApplication { package = "hello"; };
-    default_build: std::DefaultBuild = std::DefaultBuild { package = "hello"; };
-}
+pub use catalog::toolchain::Toolchain;
+
+pub use catalog::managed_hello::managed_hello;
+pub use catalog::managed_glibc::managed_glibc;
+
+pub use integrations::git::git_service;
+pub use integrations::nginx::nginx_service;
+pub use integrations::nginx::nginx_settings;
+pub use integrations::nginx::nginx_validated;
+
+pub publish(catalog, recipe): std::Recipe;
+
+pub use catalog::versioned_nginx_1_30_5_gnu::nginx;
+pub use catalog::versioned_hello_2_12_1_gnu::hello_version;

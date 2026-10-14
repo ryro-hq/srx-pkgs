@@ -1,0 +1,16 @@
+// The author supplies a managed recipe declaring the git command.
+pub fn git_service(tool: std::RecipeRef<std::Recipe>, configuration: std::ConfigText) -> std::Service {
+    std::Service {
+        id = "git";
+        files = [std::ConfigFile { path = "gitconfig"; text = configuration; }];
+        commands = [std::ServiceCommand {
+            name = "git";
+            command = std::recipe_command(tool, "git");
+            environment = [std::CommandEnvironment {
+                name = "GIT_CONFIG_GLOBAL";
+                argument = std::CommandArgument::File("gitconfig");
+            }];
+            expose = std::Option::Some("git");
+        }];
+    }
+}

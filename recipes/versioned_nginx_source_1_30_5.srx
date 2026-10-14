@@ -1,0 +1,3 @@
+pub fn acquisition() -> std::Acquisition {
+    std::Acquisition { sources = [std::source_request("https://nginx.org/download/nginx-1.30.5.tar.gz", "6c20565aa2325cb82216ae804f4a4ff1875179014759a381c42ddc8e11c4906d", 2097152)]; }
+}

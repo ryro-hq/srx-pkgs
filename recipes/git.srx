@@ -1,0 +1,98 @@
+// Experimental native Linux x86_64 factory; requires MANAGED.txt's seed contract.
+// Intentionally no recipe(): no managed seed/zlib is published by this catalogue.
+pub fn managed_git(seed: toolchain::Toolchain, libc: std::RecipeRef<std::Recipe>, zlib: std::RecipeRef<std::Recipe>, runtime_tools: std::OutputRef<std::Recipe>) -> std::Recipe {
+    std::Recipe {
+        package = std::Package { id = "git-minimal"; dependencies = []; };
+        acquisition = std::Option::Some(std::Acquisition { sources = [std::source_request(
+            "https://www.kernel.org/pub/software/scm/git/git-2.55.0.tar.xz",
+            "457fdb04dc8728e007d4688695e6912e6f680727920f2a40bf11eacc17505357", 16777216
+        )]; });
+        build_inputs = std::Option::Some(std::BuildInputs { selected = toolchain::select_inputs(seed) ++ [
+            std::recipe_output(libc, "dev"), std::recipe_output(libc, "out"),
+            std::recipe_output(zlib, "dev"), std::recipe_output(zlib, "out"), runtime_tools
+        ]; });
+        build = std::Option::Some(program());
+        commands = [std::Command {
+            name = "git"; output = "out"; path = "usr/bin/git";
+            loader = [std::RuntimeFile { output = std::recipe_output(libc, "out"); path = "usr/lib/ld-linux-x86-64.so.2"; }];
+            libraries = [std::recipe_output(libc, "out"), std::recipe_output(zlib, "out")];
+        }];
+    }
+}
+
+fn program() -> std::Build {
+    let cwd = std::BuildPath::Work("source/git-2.55.0");
+    std::Build {
+        profile = std::BuildProfile::Managed;
+        source_directory = "git-2.55.0"; source_format = std::BuildSourceFormat::Xz; timeout_seconds = 1200;
+        steps = [
+            std::BuildStep::Run(std::BuildProcess {
+                executable = std::BuildPath::Input(1, "usr/bin/python3"); directory = std::BuildPath::Work("");
+                environment = environment(); arguments = [std::build_text("-I"), std::build_text("-c"), runtime_tools::static_validation(),
+                    std::build_path(std::BuildPath::Input(9, "bin/sh")), std::build_path(std::BuildPath::Input(9, "bin/cat"))];
+            }),
+            std::BuildStep::Extract(std::BuildPath::Work("source")),
+            // Upstream executes scripts directly; normalize their shebangs to the selected seed.
+            std::BuildStep::Run(std::BuildProcess {
+                executable = std::BuildPath::Input(4, "usr/bin/sh"); directory = cwd; environment = environment();
+                arguments = [std::build_text("-eu"), std::build_text("-c"), std::build_text("find . -type f -exec sed -i \"1s|^#!/bin/sh$|#!$SYROX_BUILD_SHELL|\" {} +")];
+            }),
+            std::BuildStep::Run(std::BuildProcess {
+                executable = std::BuildPath::Input(4, "usr/bin/make"); directory = cwd; environment = environment();
+                arguments = [std::build_text("-j2"), std::build_text("git"),
+                    std::build_join([std::BuildPart::Literal("CC="), std::BuildPart::Path(std::BuildPath::Input(0, "usr/bin/cc"))]),
+                    std::build_join([std::BuildPart::Literal("AR="), std::BuildPart::Path(std::BuildPath::Input(4, "usr/bin/ar"))]),
+                    std::build_join([std::BuildPart::Literal("SHELL="), std::BuildPart::Path(std::BuildPath::Input(4, "usr/bin/sh"))]),
+                    std::build_join([std::BuildPart::Literal("SHELL_PATH="), std::BuildPart::Path(std::BuildPath::Input(4, "usr/bin/sh"))]),
+                    // Build scripts use the seed; installed helpers come from the separately checked static provider.
+                    std::build_join([std::BuildPart::Literal("SHELL_PATH_CQ=\""), std::BuildPart::Path(std::BuildPath::Installed("out", "usr/libexec/git-minimal/sh")), std::BuildPart::Literal("\"")]),
+                    std::build_join([std::BuildPart::Literal("DEFAULT_PAGER="), std::BuildPart::Path(std::BuildPath::Installed("out", "usr/libexec/git-minimal/cat"))]),
+                    std::build_join([std::BuildPart::Literal("prefix="), std::BuildPart::Path(std::BuildPath::Installed("out", "usr"))]),
+                    std::build_join([std::BuildPart::Literal("ZLIB_PATH="), std::BuildPart::Path(std::BuildPath::Input(7, "usr"))]),
+                    std::BuildText { parts = [std::BuildPart::Literal("CFLAGS=")] ++ c_flags().parts; },
+                    std::BuildText { parts = [std::BuildPart::Literal("LDFLAGS=")] ++ linker_flags().parts ++ [
+                        std::BuildPart::Literal(" -L"), std::BuildPart::Path(std::BuildPath::Input(8, "usr/lib")),
+                        std::BuildPart::Literal(" -Wl,-rpath,"), std::BuildPart::Path(std::BuildPath::Input(8, "usr/lib"))
+                    ]; },
+                    std::build_text("NO_CURL=YesPlease"), std::build_text("NO_EXPAT=YesPlease"),
+                    std::build_text("NO_OPENSSL=YesPlease"), std::build_text("NO_PERL=YesPlease"),
+                    std::build_text("NO_PYTHON=YesPlease"), std::build_text("NO_TCLTK=YesPlease"),
+                    std::build_text("NO_GETTEXT=YesPlease"), std::build_text("NO_ICONV=YesPlease"),
+                    std::build_text("NO_GITWEB=YesPlease")
+                ];
+            }),
+            std::BuildStep::Directory(std::BuildPath::Output("out", "usr/bin")),
+            std::BuildStep::Directory(std::BuildPath::Output("out", "usr/libexec/git-minimal")),
+            std::BuildStep::Copy(std::BuildPath::Work("source/git-2.55.0/git"), std::BuildPath::Output("out", "usr/bin/git")),
+            std::BuildStep::Copy(std::BuildPath::Input(9, "bin/sh"), std::BuildPath::Output("out", "usr/libexec/git-minimal/sh")),
+            std::BuildStep::Copy(std::BuildPath::Input(9, "bin/cat"), std::BuildPath::Output("out", "usr/libexec/git-minimal/cat")),
+        ];
+    }
+}
+
+fn c_flags() -> std::BuildText {
+    std::build_join([
+        std::BuildPart::Literal("-O2 -nostdinc -isystem "), std::BuildPart::Path(std::BuildPath::Input(0, "usr/lib/gcc/x86_64-pc-linux-gnu/16/include")),
+        std::BuildPart::Literal(" -isystem "), std::BuildPart::Path(std::BuildPath::Input(5, "usr/include")),
+        std::BuildPart::Literal(" -isystem "), std::BuildPart::Path(std::BuildPath::Input(3, "usr/include")),
+        std::BuildPart::Literal(" -B"), std::BuildPart::Path(std::BuildPath::Input(5, "usr/lib")), std::BuildPart::Literal("/"),
+    ])
+}
+
+fn linker_flags() -> std::BuildText {
+    std::build_join([
+        std::BuildPart::Literal("-L"), std::BuildPart::Path(std::BuildPath::Input(6, "usr/lib")),
+        std::BuildPart::Literal(" -Wl,--dynamic-linker="), std::BuildPart::Path(std::BuildPath::Input(6, "usr/lib/ld-linux-x86-64.so.2")),
+        std::BuildPart::Literal(" -Wl,--enable-new-dtags,-rpath,"), std::BuildPart::Path(std::BuildPath::Input(6, "usr/lib")),
+    ])
+}
+
+fn environment() -> [std::BuildEnv] {
+    toolchain::compiler_environment() ++ [
+        std::BuildEnv { name = "PATH"; text = toolchain::search_path(); },
+        std::BuildEnv { name = "SHELL"; text = std::build_path(std::BuildPath::Input(4, "usr/bin/sh")); },
+        std::BuildEnv { name = "LC_ALL"; text = std::build_text("C"); },
+        std::BuildEnv { name = "SYROX_BUILD_SHELL"; text = std::build_path(std::BuildPath::Input(4, "usr/bin/sh")); },
+    ]
+}
+

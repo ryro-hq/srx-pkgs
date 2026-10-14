@@ -1,0 +1,15 @@
+pub fn build() -> std::Build {
+    let cwd = std::BuildPath::Work("source/hello-2.12.1");
+    let environment = [std::BuildEnv { name = "CC"; text = std::build_text("/usr/bin/musl-gcc"); }, std::BuildEnv { name = "LDFLAGS"; text = std::build_text("-static"); }];
+    std::Build {
+        profile = std::BuildProfile::HostBootstrap;
+        source_directory = "hello-2.12.1"; timeout_seconds = 180;
+        steps = [
+            std::BuildStep::Extract(std::BuildPath::Work("source")),
+            std::BuildStep::Run(std::BuildProcess { executable = std::BuildPath::Host("/bin/sh"); directory = cwd; environment = environment;
+                arguments = [std::build_text("./configure"), std::build_text("--disable-nls"), std::build_join([std::BuildPart::Literal("--prefix="), std::BuildPart::Path(std::BuildPath::Installed("out", "usr"))])]; }),
+            std::BuildStep::Run(std::BuildProcess { executable = std::BuildPath::Host("/usr/bin/make"); directory = cwd; environment = environment; arguments = [std::build_text("-j2")]; }),
+            std::BuildStep::Run(std::BuildProcess { executable = std::BuildPath::Host("/usr/bin/make"); directory = cwd; environment = environment; arguments = [std::build_text("install"), std::build_text("DESTDIR=/out")]; }),
+        ];
+    }
+}

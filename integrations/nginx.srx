@@ -1,0 +1,39 @@
+// Configuration stays private to this service; nginx runs in the foreground.
+pub fn nginx_service(tool: std::RecipeRef<std::Recipe>, configuration: std::ConfigText) -> std::Service {
+    std::Service {
+        id = "nginx";
+        files = [std::ConfigFile { path = "nginx.conf"; text = configuration; }];
+        commands = [std::ServiceCommand {
+            name = "nginx";
+            command = std::recipe_command(tool, "nginx");
+            arguments = [
+                std::CommandArgument::Literal("-c"),
+                std::CommandArgument::File("nginx.conf"),
+                std::CommandArgument::Literal("-g"),
+                std::CommandArgument::Literal("daemon off;")
+            ];
+        }];
+        processes = [std::ServiceProcess { id = "server"; command = "nginx"; }];
+    }
+}
+
+// The package's nominal configuration type is inferred before rendering.
+// The prepared closure executes its native validator before generation freeze.
+pub fn nginx_validated(tool: std::RecipeRef<std::Recipe>, configuration: std::ConfigText) -> std::Service {
+    std::Service {
+        id = "nginx";
+        files = [std::ConfigFile { path = "nginx.conf"; text = configuration; }];
+        commands = [
+            std::ServiceCommand { name = "check-config"; command = std::recipe_command(tool, "nginx");
+                arguments = [std::CommandArgument::Literal("-t"), std::CommandArgument::Literal("-c"), std::CommandArgument::File("nginx.conf")]; },
+            std::ServiceCommand { name = "nginx"; command = std::recipe_command(tool, "nginx");
+                arguments = [std::CommandArgument::Literal("-c"), std::CommandArgument::File("nginx.conf")]; },
+        ];
+        validators = ["check-config"];
+        processes = [std::ServiceProcess { id = "server"; command = "nginx"; }];
+    }
+}
+
+pub fn nginx_settings<C>(package: std::PackageRef<C>, settings: C) -> std::Service {
+    nginx_validated(std::package_recipe(package), std::package_config(package, settings))
+}

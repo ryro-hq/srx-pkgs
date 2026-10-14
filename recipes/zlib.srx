@@ -1,0 +1,76 @@
+// Experimental native Linux x86_64 library; author supplies the admitted seed and libc.
+// No zero-argument recipe(): projection does not attest a usable bootstrap toolchain.
+pub fn managed_zlib(seed: toolchain::Toolchain, libc: std::RecipeRef<std::Recipe>) -> std::Recipe {
+    std::Recipe {
+        package = std::Package { id = "zlib"; dependencies = []; };
+        acquisition = std::Option::Some(std::Acquisition { sources = [std::source_request(
+            "https://zlib.net/fossils/zlib-1.3.2.tar.gz",
+            "bb329a0a2cd0274d05519d61c667c062e06990d72e125ee2dfa8de64f0119d16", 2097152
+        )]; });
+        build_inputs = std::Option::Some(std::BuildInputs { selected = toolchain::select_inputs(seed) ++ [
+            std::recipe_output(libc, "dev"), std::recipe_output(libc, "out")
+        ]; });
+        build = std::Option::Some(program());
+        commands = [];
+    }
+}
+
+fn program() -> std::Build {
+    let cwd = std::BuildPath::Work("source/zlib-1.3.2");
+    std::Build {
+        profile = std::BuildProfile::Managed;
+        source_directory = "zlib-1.3.2"; timeout_seconds = 600; produces = ["dev", "out"];
+        steps = [
+            std::BuildStep::Extract(std::BuildPath::Work("source")),
+            std::BuildStep::Run(std::BuildProcess {
+                executable = std::BuildPath::Input(4, "usr/bin/sh"); directory = cwd; environment = environment();
+                arguments = [std::build_text("configure"), std::build_text("--shared"),
+                    std::build_join([std::BuildPart::Literal("--prefix="), std::BuildPart::Path(std::BuildPath::Installed("dev", "usr"))])];
+            }),
+            std::BuildStep::Run(std::BuildProcess {
+                executable = std::BuildPath::Input(4, "usr/bin/make"); directory = cwd; environment = environment();
+                arguments = [std::build_text("-j2"), std::build_text("libz.so.1.3.2"),
+                    std::build_join([std::BuildPart::Literal("SHELL="), std::BuildPart::Path(std::BuildPath::Input(4, "usr/bin/sh"))])];
+            }),
+            std::BuildStep::Directory(std::BuildPath::Output("dev", "usr/include")),
+            std::BuildStep::Directory(std::BuildPath::Output("dev", "usr/lib")),
+            std::BuildStep::Directory(std::BuildPath::Output("out", "usr/lib")),
+            std::BuildStep::Copy(std::BuildPath::Work("source/zlib-1.3.2/zlib.h"), std::BuildPath::Output("dev", "usr/include/zlib.h")),
+            std::BuildStep::Copy(std::BuildPath::Work("source/zlib-1.3.2/zconf.h"), std::BuildPath::Output("dev", "usr/include/zconf.h")),
+            // Regular copies preserve the current artifact contract: no symlink escape or cross-output linker script.
+            std::BuildStep::Copy(std::BuildPath::Work("source/zlib-1.3.2/libz.so.1.3.2"), std::BuildPath::Output("dev", "usr/lib/libz.so")),
+            std::BuildStep::Copy(std::BuildPath::Work("source/zlib-1.3.2/libz.so.1.3.2"), std::BuildPath::Output("out", "usr/lib/libz.so.1")),
+            std::BuildStep::Copy(std::BuildPath::Work("source/zlib-1.3.2/libz.so.1.3.2"), std::BuildPath::Output("out", "usr/lib/libz.so.1.3.2")),
+        ];
+    }
+}
+
+fn c_flags() -> std::BuildText {
+    std::build_join([
+        std::BuildPart::Literal("-O2 -nostdinc -isystem "), std::BuildPart::Path(std::BuildPath::Input(0, "usr/lib/gcc/x86_64-pc-linux-gnu/16/include")),
+        std::BuildPart::Literal(" -isystem "), std::BuildPart::Path(std::BuildPath::Input(5, "usr/include")),
+        std::BuildPart::Literal(" -isystem "), std::BuildPart::Path(std::BuildPath::Input(3, "usr/include")),
+        std::BuildPart::Literal(" -B"), std::BuildPart::Path(std::BuildPath::Input(5, "usr/lib")), std::BuildPart::Literal("/"),
+    ])
+}
+
+fn linker_flags() -> std::BuildText {
+    std::build_join([
+        std::BuildPart::Literal("-L"), std::BuildPart::Path(std::BuildPath::Input(6, "usr/lib")),
+        std::BuildPart::Literal(" -Wl,--dynamic-linker="), std::BuildPart::Path(std::BuildPath::Input(6, "usr/lib/ld-linux-x86-64.so.2")),
+        std::BuildPart::Literal(" -Wl,--enable-new-dtags,-rpath,"), std::BuildPart::Path(std::BuildPath::Input(6, "usr/lib")),
+    ])
+}
+
+fn environment() -> [std::BuildEnv] {
+    toolchain::compiler_environment() ++ [
+        std::BuildEnv { name = "PATH"; text = toolchain::search_path(); },
+        std::BuildEnv { name = "SHELL"; text = std::build_path(std::BuildPath::Input(4, "usr/bin/sh")); },
+        std::BuildEnv { name = "CC"; text = std::build_path(std::BuildPath::Input(0, "usr/bin/cc")); },
+        std::BuildEnv { name = "AR"; text = std::build_path(std::BuildPath::Input(4, "usr/bin/ar")); },
+        std::BuildEnv { name = "RANLIB"; text = std::build_path(std::BuildPath::Input(4, "usr/bin/ranlib")); },
+        std::BuildEnv { name = "CFLAGS"; text = c_flags(); },
+        std::BuildEnv { name = "LDFLAGS"; text = linker_flags(); },
+        std::BuildEnv { name = "LC_ALL"; text = std::build_text("C"); },
+    ]
+}

@@ -1,0 +1,18 @@
+// Experimental managed factory; hello.srx's default recipe remains HostBootstrap.
+pub fn managed_hello(seed: toolchain::Toolchain, libc: std::RecipeRef<std::Recipe>) -> std::Recipe {
+    std::Recipe {
+        package = std::Package { id = "hello-managed"; dependencies = []; };
+        acquisition = std::Option::Some(hello_source::acquisition());
+        build = std::Option::Some(managed_build::autotools(std::BuildOptions {
+            source_directory = "hello-2.12.1"; timeout_seconds = 120;
+        }));
+        build_inputs = std::Option::Some(std::BuildInputs { selected = toolchain::select_inputs(seed) ++ [
+            std::recipe_output(libc, "dev"), std::recipe_output(libc, "out")
+        ]; });
+        commands = [std::Command {
+            name = "hello"; output = "out"; path = "usr/bin/hello";
+            loader = [std::RuntimeFile { output = std::recipe_output(libc, "out"); path = "usr/lib/ld-linux-x86-64.so.2"; }];
+            libraries = [std::recipe_output(libc, "out")];
+        }];
+    }
+}

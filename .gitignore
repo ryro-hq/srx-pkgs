@@ -1,2 +1,8 @@
 *.md
 !/README.md
+/.core/
+/.environment/
+/.store/
+/.evidence/
+/.release/
+/build.toml

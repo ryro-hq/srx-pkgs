@@ -1,0 +1,50 @@
+name: Pinned Syrox
+description: Build the exact core and authenticate its static CLI and worker
+outputs:
+  sha:
+    description: Checked core commit
+    value: ${{ steps.pin.outputs.sha }}
+runs:
+  using: composite
+  steps:
+    - id: pin
+      shell: bash
+      run: |
+        sha=$(cat .syrox-core)
+        [[ "$sha" =~ ^[0-9a-f]{40}$ ]]
+        echo "sha=$sha" >> "$GITHUB_OUTPUT"
+    - uses: actions/checkout@v7
+      with:
+        repository: ryro-hq/syrox
+        ref: ${{ steps.pin.outputs.sha }}
+        path: .core
+        persist-credentials: false
+    - shell: bash
+      working-directory: .core
+      run: |
+        rustup show active-toolchain
+        sudo apt-get update
+        sudo apt-get install -y musl-tools liblzma-dev pkg-config gnupg
+    - uses: actions/cache@v6
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          .core/target/debug
+          .core/target/release
+          .core/target/x86_64-unknown-linux-gnu
+        key: core-linux-x86_64-gnu-${{ steps.pin.outputs.sha }}-${{ hashFiles('.core/Cargo.lock') }}
+    - shell: bash
+      working-directory: .core
+      env:
+        RUSTFLAGS: -C target-feature=+crt-static
+        LZMA_API_STATIC: '1'
+      run: |
+        cargo build --locked --release -p syrox --bin syrox-worker --target x86_64-unknown-linux-gnu
+        SYROX_EMBED_WORKER="$PWD/target/x86_64-unknown-linux-gnu/release/syrox-worker" \
+          cargo build --locked --release -p syrox --bin srx --target x86_64-unknown-linux-gnu
+        RUSTFLAGS='' cargo run --locked -p syrox-engine --example verify_release -- "$PWD/target/x86_64-unknown-linux-gnu/release"
+        mkdir -p target/catalog-candidate
+        cp target/x86_64-unknown-linux-gnu/release/{srx,syrox-worker} target/catalog-candidate/
+        RUSTFLAGS='' cargo run --locked -p syrox-engine --example ci_candidates -- "$PWD/target/catalog-candidate" x86_64-unknown-linux-gnu
+        echo "$PWD/target/catalog-candidate" >> "$GITHUB_PATH"

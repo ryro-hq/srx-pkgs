@@ -1,0 +1,40 @@
+// Explicit normalized x86_64 GNU GCC 16 seed layout; references confer no admission.
+// Each output retains the inventory's usr/... layout and must fit its own Artifact.
+pub struct Toolchain {
+    compiler: std::OutputRef<std::Recipe>;
+    python: std::OutputRef<std::Recipe>;
+    runtime: std::OutputRef<std::Recipe>;
+    sysroot: std::OutputRef<std::Recipe>;
+    tools: std::OutputRef<std::Recipe>;
+}
+
+// Stable BuildPath::Input slots shared by all managed catalogue factories.
+pub fn select_inputs(seed: Toolchain) -> [std::OutputRef<std::Recipe>] {
+    [seed.compiler, seed.python, seed.runtime, seed.sysroot, seed.tools]
+}
+
+pub fn search_path() -> std::BuildText {
+    std::build_join([
+        std::BuildPart::Path(std::BuildPath::Input(0, "usr/bin")), std::BuildPart::Literal(":"),
+        std::BuildPart::Path(std::BuildPath::Input(4, "usr/bin")), std::BuildPart::Literal(":"),
+        std::BuildPart::Path(std::BuildPath::Input(1, "usr/bin")),
+    ])
+}
+
+pub fn compiler_environment() -> [std::BuildEnv] {
+    [
+        std::BuildEnv { name = "GCC_EXEC_PREFIX"; text = std::build_join([
+            std::BuildPart::Path(std::BuildPath::Input(0, "usr/lib/gcc/x86_64-pc-linux-gnu/16")), std::BuildPart::Literal("/")]); },
+        std::BuildEnv { name = "COMPILER_PATH"; text = std::build_join([
+            std::BuildPart::Path(std::BuildPath::Input(0, "usr/lib/gcc/x86_64-pc-linux-gnu/16")), std::BuildPart::Literal(":"),
+            std::BuildPart::Path(std::BuildPath::Input(4, "usr/bin"))]); },
+    ]
+}
+
+// Perl data paths are declared inputs; compiled defaults are not a relocation proof.
+pub fn perl_environment() -> [std::BuildEnv] {
+    [std::BuildEnv { name = "PERL5LIB"; text = std::build_join([
+        std::BuildPart::Path(std::BuildPath::Input(4, "usr/lib/perl5/5.42/core_perl")),
+        std::BuildPart::Literal(":"),
+        std::BuildPart::Path(std::BuildPath::Input(4, "usr/share/perl5/core_perl"))]); }]
+}

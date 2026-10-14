@@ -1,0 +1,93 @@
+// Experimental Linux x86_64 factory: requires MANAGED.txt's complete bootstrap sysroot.
+pub fn managed_glibc(seed: toolchain::Toolchain) -> std::Recipe {
+    std::Recipe {
+        package = std::Package { id = "glibc-managed"; dependencies = []; };
+        acquisition = std::Option::Some(glibc_source::acquisition());
+        build = std::Option::Some(build(std::BuildOptions { source_directory = "glibc-2.44"; timeout_seconds = 1800; }));
+        build_inputs = std::Option::Some(std::BuildInputs { selected = toolchain::select_inputs(seed); });
+        commands = [];
+    }
+}
+
+fn build(options: std::BuildOptions) -> std::Build {
+    let cwd = std::BuildPath::Work("build");
+    std::Build {
+        profile = std::BuildProfile::Managed;
+        source_directory = options.source_directory; timeout_seconds = options.timeout_seconds;
+        resources = std::BuildResources::Large; source_format = std::BuildSourceFormat::Xz; produces = ["dev", "out"];
+        steps = [
+            std::BuildStep::Extract(std::BuildPath::Work("source")),
+            // The pinned source calls this script directly from Makerules and posix/Makefile.
+            std::BuildStep::Run(std::BuildProcess { executable = std::BuildPath::Input(1, "usr/bin/python3"); directory = std::BuildPath::Work("");
+                environment = environment(target_compiler());
+                arguments = [std::build_text("-I"), std::build_text("-c"), std::build_text("import os, pathlib, stat, sys\npath = pathlib.Path(sys.argv[1])\nshell = os.fsencode(sys.argv[2])\nheader = b'#!' + shell + b'\\n'\nif not shell.startswith(b'/') or any(byte <= 32 or byte == 127 for byte in shell) or len(header) > 127:\n    raise SystemExit('invalid declared shell shebang')\nbefore = path.read_bytes()\noriginal = b'#! /bin/sh\\n'\nif not before.startswith(original):\n    raise SystemExit('unexpected glibc mkinstalldirs shebang')\nmode = stat.S_IMODE(path.stat().st_mode)\npath.write_bytes(header + before[len(original):])\nif stat.S_IMODE(path.stat().st_mode) != mode:\n    raise SystemExit('mkinstalldirs mode changed')\n"),
+                    std::build_path(std::BuildPath::Work("source/${options.source_directory}/scripts/mkinstalldirs")), std::build_path(std::BuildPath::Input(4, "usr/bin/sh"))]; }),
+            std::BuildStep::Directory(cwd),
+            std::BuildStep::Run(std::BuildProcess { executable = std::BuildPath::Input(4, "usr/bin/sh"); directory = cwd;
+                arguments = [std::build_path(std::BuildPath::Work("source/${options.source_directory}/configure")), std::build_join([std::BuildPart::Literal("--prefix="), std::BuildPart::Path(std::BuildPath::Installed("out", "usr"))]), std::build_text("--disable-werror"), std::build_join([std::BuildPart::Literal("--with-headers="), std::BuildPart::Path(std::BuildPath::Input(3, "usr/include"))])]; environment = environment(bootstrap_compiler()) ++ [std::BuildEnv { name = "INSTALL"; text = std::build_join([
+                    std::BuildPart::Path(std::BuildPath::Input(4, "usr/bin/sh")), std::BuildPart::Literal(" "),
+                    std::BuildPart::Path(std::BuildPath::Work("source/${options.source_directory}/scripts/install-sh")), std::BuildPart::Literal(" -c")]); }]; }),
+            std::BuildStep::Run(std::BuildProcess { executable = std::BuildPath::Input(4, "usr/bin/make"); directory = cwd; environment = environment(target_compiler()); arguments = [std::build_text("-j2"), make_shell(), make_cc(), make_build_cc()]; }),
+            std::BuildStep::Run(std::BuildProcess { executable = std::BuildPath::Input(4, "usr/bin/make"); directory = cwd; environment = environment(target_compiler()); arguments = [std::build_text("install"), std::build_text("DESTDIR=/out"), make_shell(), make_cc(), make_build_cc()]; }),
+            std::BuildStep::Directory(std::BuildPath::Output("out", "usr/lib/locale")),
+            std::BuildStep::Run(std::BuildProcess { executable = std::BuildPath::Output("out", "usr/lib/ld-linux-x86-64.so.2"); directory = cwd;
+                arguments = [std::build_text("--library-path"), std::build_path(std::BuildPath::Output("out", "usr/lib")), std::build_path(std::BuildPath::Output("out", "usr/bin/localedef")), std::build_text("--no-archive"), std::build_text("-i"), std::build_text("C"), std::build_text("-f"), std::build_text("UTF-8"), std::build_path(std::BuildPath::Output("out", "usr/lib/locale/C.utf8"))];
+                environment = environment(target_compiler()) ++ [std::BuildEnv { name = "I18NPATH"; text = std::build_path(std::BuildPath::Output("out", "usr/share/i18n")); }]; }),
+            std::BuildStep::Run(std::BuildProcess { executable = std::BuildPath::Input(4, "usr/bin/sh"); directory = cwd;
+                arguments = [std::build_text("-eu"), std::build_text("-c"), std::build_text("test -f \"$OUT/usr/lib/locale/C.utf8/LC_CTYPE\"\nmkdir -p \"$DEV/usr/lib\"\nmv \"$OUT/usr/include\" \"$DEV/usr/include\"\nmv \"$OUT/usr/share\" \"$DEV/usr/share\"\nfor path in \"$OUT/usr/lib/\"*; do\nname=$(basename \"$path\")\ncase \"$name\" in ld.so) ;; *.a|*.o|*.so) if test -L \"$path\"; then cp -L -- \"$path\" \"$DEV/usr/lib/$name\"; rm -- \"$path\"; else mv -- \"$path\" \"$DEV/usr/lib/$name\"; fi;; esac\ndone\nsed -i \"s|$PREFIX_OUT/usr/lib/libc_nonshared.a|$PREFIX_DEV/usr/lib/libc_nonshared.a|g\" \"$DEV/usr/lib/libc.so\"\n")];
+                environment = environment(target_compiler()) ++ [
+                    std::BuildEnv { name = "DEV"; text = std::build_path(std::BuildPath::Output("dev", "")); },
+                    std::BuildEnv { name = "OUT"; text = std::build_path(std::BuildPath::Output("out", "")); },
+                    std::BuildEnv { name = "PREFIX_DEV"; text = std::build_path(std::BuildPath::Installed("dev", "")); },
+                    std::BuildEnv { name = "PREFIX_OUT"; text = std::build_path(std::BuildPath::Installed("out", "")); },
+                ]; }),
+        ];
+    }
+}
+
+fn make_shell() -> std::BuildText {
+    std::build_join([std::BuildPart::Literal("SHELL="), std::BuildPart::Path(std::BuildPath::Input(4, "usr/bin/sh"))])
+}
+fn make_cc() -> std::BuildText {
+    std::BuildText { parts = [std::BuildPart::Literal("CC=")] ++ target_compiler().parts; }
+}
+fn make_build_cc() -> std::BuildText {
+    std::BuildText { parts = [std::BuildPart::Literal("BUILD_CC=")] ++ bootstrap_compiler().parts; }
+}
+// Target links must not inherit the bootstrap interpreter or RUNPATH.
+fn target_compiler() -> std::BuildText {
+    std::build_join([
+        std::BuildPart::Path(std::BuildPath::Input(0, "usr/bin/gcc")),
+        std::BuildPart::Literal(" --sysroot="), std::BuildPart::Path(std::BuildPath::Input(3, "")),
+    ])
+}
+// Configure probes and build-only helper programs execute against the seed libc.
+fn bootstrap_compiler() -> std::BuildText {
+    std::build_join([
+        std::BuildPart::Path(std::BuildPath::Input(0, "usr/bin/gcc")),
+        std::BuildPart::Literal(" --sysroot="), std::BuildPart::Path(std::BuildPath::Input(3, "")),
+        std::BuildPart::Literal(" -Wl,--dynamic-linker="), std::BuildPart::Path(std::BuildPath::Input(3, "usr/lib/ld-linux-x86-64.so.2")),
+        std::BuildPart::Literal(" -Wl,--enable-new-dtags,-rpath,"), std::BuildPart::Path(std::BuildPath::Input(3, "usr/lib")),
+    ])
+}
+fn environment(cc: std::BuildText) -> [std::BuildEnv] {
+    toolchain::compiler_environment() ++ [
+        std::BuildEnv { name = "PATH"; text = toolchain::search_path(); },
+        std::BuildEnv { name = "SHELL"; text = std::build_path(std::BuildPath::Input(4, "usr/bin/sh")); },
+        std::BuildEnv { name = "CONFIG_SHELL"; text = std::build_path(std::BuildPath::Input(4, "usr/bin/sh")); },
+        std::BuildEnv { name = "CC"; text = cc; },
+        std::BuildEnv { name = "BUILD_CC"; text = bootstrap_compiler(); },
+        std::BuildEnv { name = "CFLAGS"; text = std::build_text("-O2"); },
+        std::BuildEnv { name = "AWK"; text = std::build_path(std::BuildPath::Input(4, "usr/bin/gawk")); },
+        std::BuildEnv { name = "BISON"; text = std::build_path(std::BuildPath::Input(4, "usr/bin/bison")); },
+        std::BuildEnv { name = "BISON_PKGDATADIR"; text = std::build_path(std::BuildPath::Input(4, "usr/share/bison")); },
+        std::BuildEnv { name = "M4"; text = std::build_path(std::BuildPath::Input(4, "usr/bin/m4")); },
+        std::BuildEnv { name = "PYTHON"; text = std::build_path(std::BuildPath::Input(1, "usr/bin/python3")); },
+        std::BuildEnv { name = "AR"; text = std::build_path(std::BuildPath::Input(4, "usr/bin/ar")); },
+        std::BuildEnv { name = "AS"; text = std::build_path(std::BuildPath::Input(4, "usr/bin/as")); },
+        std::BuildEnv { name = "LD"; text = std::build_path(std::BuildPath::Input(4, "usr/bin/ld")); },
+        std::BuildEnv { name = "NM"; text = std::build_path(std::BuildPath::Input(4, "usr/bin/nm")); },
+        std::BuildEnv { name = "RANLIB"; text = std::build_path(std::BuildPath::Input(4, "usr/bin/ranlib")); },
+        std::BuildEnv { name = "LC_ALL"; text = std::build_text("C"); },
+    ]
+}

@@ -1,0 +1,2 @@
+pub struct Settings {}
+pub fn render(settings: Settings) -> std::ConfigText { "" }

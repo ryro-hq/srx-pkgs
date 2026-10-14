@@ -1,0 +1,45 @@
+pub fn build(directory: std::SourceDirectory, compiler: std::BuildText, environment: [std::BuildEnv], before: [std::BuildStep], static_link: [std::BuildText]) -> std::Build {
+    let cwd = std::BuildPath::Work("source/${directory}");
+    std::Build {
+        profile = std::BuildProfile::HostBootstrap;
+        source_directory = directory; timeout_seconds = 600;
+        steps = [std::BuildStep::Extract(std::BuildPath::Work("source"))] ++ before ++ [
+            std::BuildStep::Run(std::BuildProcess {
+                executable = std::BuildPath::Host("/bin/sh"); directory = cwd; environment = environment;
+                arguments = [std::build_text("configure"), compiler,
+                    std::build_join([std::BuildPart::Literal("--prefix="), std::BuildPart::Path(std::BuildPath::Installed("out", "usr"))]),
+                    std::build_text("--without-http_rewrite_module"), std::build_text("--without-pcre"),
+                    std::build_text("--without-http_gzip_module"), std::build_text("--without-http_auth_basic_module"),
+                    std::build_text("--without-http-cache"), std::build_text("--error-log-path=stderr"),
+                    std::build_text("--http-log-path=/dev/stdout"), std::build_text("--pid-path=/tmp/nginx.pid"),
+                    std::build_text("--lock-path=/tmp/nginx.lock"), std::build_text("--http-client-body-temp-path=/tmp/client-body"),
+                    std::build_text("--http-proxy-temp-path=/tmp/proxy"), std::build_text("--http-fastcgi-temp-path=/tmp/fastcgi"),
+                    std::build_text("--http-uwsgi-temp-path=/tmp/uwsgi"), std::build_text("--http-scgi-temp-path=/tmp/scgi")
+                ] ++ static_link;
+            }),
+            std::BuildStep::Run(std::BuildProcess {
+                executable = std::BuildPath::Host("/usr/bin/make"); directory = cwd; environment = environment;
+                arguments = [std::build_text("-j2")];
+            }),
+            std::BuildStep::Directory(std::BuildPath::Output("out", "usr/bin")),
+            std::BuildStep::Copy(std::BuildPath::Work("source/${directory}/objs/nginx"), std::BuildPath::Output("out", "usr/bin/nginx")),
+        ];
+    }
+}
+
+pub fn gnu_environment() -> [std::BuildEnv] {
+    [std::BuildEnv { name = "LIBC_DEV"; text = std::build_path(std::BuildPath::Input(0, "")); },
+     std::BuildEnv { name = "LIBC_OUT"; text = std::build_path(std::BuildPath::Input(1, "")); }]
+}
+
+pub fn gnu_setup() -> [std::BuildStep] {
+    [
+        std::BuildStep::Directory(std::BuildPath::Work("kernel-headers")),
+        std::BuildStep::Run(std::BuildProcess { executable = std::BuildPath::Host("/bin/sh"); directory = std::BuildPath::Work("kernel-headers");
+            arguments = [std::build_text("-eu"), std::build_text("-c"), std::build_text("for name in linux asm asm-generic; do if test -d /usr/include/$name; then ln -s /usr/include/$name $name; fi; done")]; }),
+        std::BuildStep::Write(std::BuildFile {
+            path = std::BuildPath::Work("cc"); mode = std::BuildFileMode::Executable;
+            text = std::build_text("#!/bin/sh\nset -eu\ninclude=$(/usr/bin/gcc -print-file-name=include)\ncase \"$include\" in /usr/lib/gcc/*) ;; *) exit 1;; esac\ntest -d \"$include\"\nexec /usr/bin/gcc -B\"$LIBC_DEV/usr/lib/\" -nostdinc -isystem \"$include\" -isystem \"$LIBC_DEV/usr/include\" -isystem /work/kernel-headers -Wl,-L,\"$LIBC_OUT/usr/lib\" -Wl,--dynamic-linker=\"$LIBC_OUT/usr/lib/ld-linux-x86-64.so.2\" -Wl,--enable-new-dtags,-rpath,\"$LIBC_OUT/usr/lib\" \"$@\"\n");
+        }),
+    ]
+}

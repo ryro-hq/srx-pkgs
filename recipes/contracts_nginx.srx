@@ -1,0 +1,29 @@
+// Explicitly shared by 1.30.5/1.30.6 minimal builds in both supported ABIs.
+pub value ListenPort(int) where 1..=65535;
+pub value ProxyUrl(str);
+pub struct Settings {
+    listen: ListenPort = 8080;
+    proxyPass: ProxyUrl = "http://127.0.0.1:3000";
+    extraConfig: std::ConfigText = "";
+}
+
+pub fn render(settings: Settings) -> std::ConfigText {
+    """daemon off;
+error_log stderr;
+pid /tmp/nginx.pid;
+events {}
+http {
+    access_log /dev/stdout;
+    client_body_temp_path /tmp/client-body;
+    proxy_temp_path /tmp/proxy;
+    fastcgi_temp_path /tmp/fastcgi;
+    uwsgi_temp_path /tmp/uwsgi;
+    scgi_temp_path /tmp/scgi;
+    server {
+        listen ${settings.listen};
+        location / { proxy_pass ${settings.proxyPass}; }
+        ${settings.extraConfig}
+    }
+}
+"""
+}

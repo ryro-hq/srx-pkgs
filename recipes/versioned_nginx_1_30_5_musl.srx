@@ -1,0 +1,13 @@
+pub fn nginx() -> std::PackageRef<contracts_nginx::Settings> package("nginx", "1.30.5", "minimal", "linux-x86_64-musl") {
+    std::with_package_service(std::package_ref(std::recipe_ref(raw_recipe), "1.30.5", "minimal", "linux-x86_64-musl", "b6c694abe5f27d3c19d75885d78ecad207037104831b4ca3a14ce370dbd792c6", contracts_nginx::render), project::nginx_validated)
+}
+
+pub fn recipe() -> std::Recipe { std::recipe_value(std::package_recipe(nginx())) }
+
+fn raw_recipe() -> std::Recipe { std::Recipe {
+        package = std::Package { id = "nginx"; dependencies = []; };
+        acquisition = std::Option::Some(versioned_nginx_source_1_30_5::acquisition());
+        build = std::Option::Some(nginx_version_build::build("nginx-1.30.5", std::build_text("--with-cc=/usr/bin/musl-gcc"), [], [], [std::build_text("--with-ld-opt=-static")]));
+        
+        commands = [std::Command { name = "nginx"; output = "out"; path = "usr/bin/nginx";  }];
+    } }

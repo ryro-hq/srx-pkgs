@@ -1,0 +1,13 @@
+pub fn nginx() -> std::PackageRef<contracts_nginx::Settings> package("nginx", "1.30.6", "minimal", "linux-x86_64-gnu") {
+    std::with_package_service(std::package_ref(std::recipe_ref(raw_recipe), "1.30.6", "minimal", "linux-x86_64-gnu", "b6c694abe5f27d3c19d75885d78ecad207037104831b4ca3a14ce370dbd792c6", contracts_nginx::render), project::nginx_validated)
+}
+
+pub fn recipe() -> std::Recipe { std::recipe_value(std::package_recipe(nginx())) }
+
+fn raw_recipe() -> std::Recipe { std::Recipe {
+        package = std::Package { id = "nginx"; dependencies = []; };
+        acquisition = std::Option::Some(versioned_nginx_source_1_30_6::acquisition());
+        build = std::Option::Some(nginx_version_build::build("nginx-1.30.6", std::build_join([std::BuildPart::Literal("--with-cc="), std::BuildPart::Path(std::BuildPath::Work("cc"))]), nginx_version_build::gnu_environment(), nginx_version_build::gnu_setup(), []));
+        build_inputs = std::Option::Some(std::BuildInputs { selected = [std::recipe_output(project::glibc, "dev"), std::recipe_output(project::glibc, "out")]; });
+        commands = [std::Command { name = "nginx"; output = "out"; path = "usr/bin/nginx"; loader = [std::RuntimeFile { output = std::recipe_output(project::glibc, "out"); path = "usr/lib/ld-linux-x86-64.so.2"; }]; libraries = [std::recipe_output(project::glibc, "out")]; }];
+    } }
