@@ -48,6 +48,7 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
         run: |
           python3 tests/test-package-templates.py "$(command -v srx)"
+          python3 tests/test-configured-template.py "$(command -v srx)"
           python3 hosts/systemd/sync.py /tmp/systemd-contract.json --check
           python3 tests/test-systemd-contract.py /tmp/systemd-contract.json
           python3 tests/check-packages.py "$(command -v srx)"

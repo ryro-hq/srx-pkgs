@@ -75,6 +75,8 @@ upstream_baseline = 254
 extends = "supervision"
 [profiles.managed.manager_methods]
 "LoadUnit" = "s->o"
+[profiles.managed.manager_properties]
+"UnitPath" = "as"
 [profiles.managed.service_methods]
 "DumpFileDescriptorStore" = "->a(suuutuusu)"
 [profiles.managed.service_properties]

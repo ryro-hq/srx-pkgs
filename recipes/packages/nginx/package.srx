@@ -15,14 +15,8 @@ pub fn nginx(const selection: Selection) -> _ {
     match compatibility.id {
         "minimal" => match target.system {
             "linux-x86_64" => match target.libc {
-                "gnu" => package_traits::reference(variants::Gnu {
-                        source = source;
-                        compatibility = compatibility;
-                    }),
-                "musl" => package_traits::reference(variants::Musl {
-                        source = source;
-                        compatibility = compatibility;
-                    }),
+                "gnu" => variants::gnu(source, compatibility),
+                "musl" => variants::musl(source, compatibility),
             }
         }
     }

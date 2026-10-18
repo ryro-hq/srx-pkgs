@@ -19,7 +19,7 @@ recipes/
       package.srx                Public version/platform selection
       releases.srx               Generated qualified release data
       build.srx                  GNU/musl specializations of shared templates
-      variants.srx               Package trait implementations
+      variants.srx               Typed platform adapters sharing one settings contract
       managed.srx                Experimental managed construction
       legacy.srx                 Existing bootstrap factory
       contracts/default.srx      Nominal settings and rendering
@@ -36,6 +36,7 @@ recipes/
     runtime.srx                  Runtime helper validation
   templates/
     recipe.srx                   SourceRecipe, dependencies and GNU command construction
+    configured.srx               Definition<Settings>, lazy package and service construction
     process.srx                  Typed process, environment and argument helpers
     autotools.srx                Configurable configure / make / install sequence
   support.srx                    Source and Compatibility data shared with generated releases
@@ -96,6 +97,57 @@ There is no shell interpolation of paths by the template layer. Shell programs
 are explicit process arguments. Native `${...}` interpolation is evaluated by
 Syrox's checker and evaluator, including existing configuration renderers.
 The Python authoring tool only creates files; it does not participate in evaluation.
+
+For a package with settings, use the typed package template. Hello and nginx
+share this helper across GNU and musl instead of repeating `Package` and
+`ServicePackage` implementations for each platform:
+
+```srx
+templates::configured::reference<contracts::minimal::Settings>({
+    source = source;
+    compatibility = compatibility;
+    system = "linux-x86_64-gnu";
+    build = build::gnu;
+    render = contracts::minimal::render;
+    integrate = Option::Some(integration::nginx_validated);
+})
+```
+
+`Definition<C>` keeps the builder lazy, derives the exact version and variant
+from verified metadata, and returns `PackageRef<C>`. `integrate` is optional;
+Hello omits it. The compiler rejects a renderer for another settings type.
+Platform adapters choose the builder and complete target tag. The helper retains
+the same package identity construction, configuration and service validation.
+Custom packages can still implement `package_traits::Package` when an interface
+needs additional static operations.
+
+## Maintain several versions
+
+Keep one package directory. For nginx, `catalog.toml` lists 1.30.5 and 1.30.6
+with separate verified source pins and compatibility entries, while both reuse
+`build.srx`, `steps.srx`, `variants.srx` and `contracts/minimal.srx`. The public
+selector accepts an exact version:
+
+```srx
+let packages = pkgs.forPlatform { system = "linux-x86_64"; libc = "musl"; };
+let stable = packages.nginx { version = "1.30.5"; };
+let newer = packages.nginx { version = "1.30.6"; };
+```
+
+Add a release with `srx catalog add . nginx VERSION` after its signed upstream
+archive is available. That command verifies the pinned upstream authority and
+generates release data and a change record. Review compatibility explicitly:
+reuse a contract only if the accepted settings and their meaning remain the
+same. A changed settings interface gets its own `contracts/NAME.srx`, matching
+renderer and compatibility pin. Build differences belong in shared typed
+templates or a small explicit version branch, rather than copied trees.
+
+Run the package/platform tests, `catalog generate . --check` and
+`catalog lock . --check`. A recipe/helper or core pin change creates new catalog
+identities; the lock retains earlier identities in history. Qualification and
+release bundles belong to the exact catalog/core snapshot they tested. Regenerate
+and qualify the changed combinations before publishing a new release manifest;
+old evidence remains evidence for the old snapshot.
 
 ## Create a package
 

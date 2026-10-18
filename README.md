@@ -104,6 +104,7 @@ engine as well as the XML comparison behavior.
 test "$(git -C ../syrox rev-parse HEAD)" = "$(cat .syrox-core)"
 (cd ../syrox && cargo run --locked -p syrox-engine --example systemd_contract) > /tmp/systemd-contract.json
 python3 tests/test-package-templates.py "$(command -v srx)"
+python3 tests/test-configured-template.py "$(command -v srx)"
 python3 hosts/systemd/sync.py /tmp/systemd-contract.json --check
 python3 tests/test-systemd-contract.py /tmp/systemd-contract.json
 python3 tests/check-packages.py "$(command -v srx)"
