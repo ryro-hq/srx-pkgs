@@ -1,0 +1,72 @@
+pub struct Gnu {
+    source: support::Source;
+    compatibility: support::Compatibility;
+}
+pub struct Musl {
+    source: support::Source;
+    compatibility: support::Compatibility;
+}
+impl package_traits::Package for Gnu {
+    type Settings = contracts::minimal::Settings;
+    fn reference(package: Self) -> PackageRef<Self::Settings> {
+        with_package_service(
+            package_ref(
+                recipe_ref(fn() -> Recipe {
+                        build::gnu(package.source)
+                    }),
+                package.source.version,
+                "minimal",
+                "linux-x86_64-gnu",
+                package.compatibility.pin,
+                contracts::minimal::render
+            ),
+            integration::nginx_validated
+        )
+    }
+    fn recipe(package: Self) -> RecipeRef<Recipe> {
+        package_recipe(Self::reference(package))
+    }
+    fn render(package: Self, settings: Self::Settings) -> ConfigText {
+        contracts::minimal::render(settings)
+    }
+}
+impl package_traits::ServicePackage for Gnu {
+    fn service(package: Self, settings: Self::Settings) -> Service {
+        integration::nginx_validated(
+            package_traits::Package::recipe(package),
+            contracts::minimal::render(settings)
+        )
+    }
+}
+impl package_traits::Package for Musl {
+    type Settings = contracts::minimal::Settings;
+    fn reference(package: Self) -> PackageRef<Self::Settings> {
+        with_package_service(
+            package_ref(
+                recipe_ref(fn() -> Recipe {
+                        build::musl(package.source)
+                    }),
+                package.source.version,
+                "minimal",
+                "linux-x86_64-musl",
+                package.compatibility.pin,
+                contracts::minimal::render
+            ),
+            integration::nginx_validated
+        )
+    }
+    fn recipe(package: Self) -> RecipeRef<Recipe> {
+        package_recipe(Self::reference(package))
+    }
+    fn render(package: Self, settings: Self::Settings) -> ConfigText {
+        contracts::minimal::render(settings)
+    }
+}
+impl package_traits::ServicePackage for Musl {
+    fn service(package: Self, settings: Self::Settings) -> Service {
+        integration::nginx_validated(
+            package_traits::Package::recipe(package),
+            contracts::minimal::render(settings)
+        )
+    }
+}

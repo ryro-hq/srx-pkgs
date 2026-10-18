@@ -1,0 +1,42 @@
+// Package identity, pinned acquisition and the bounded build are separate values.
+fn hello_package() -> Package {
+    Package {
+        id = "hello";
+        dependencies = [];
+    }
+}
+fn hello_sources() -> Acquisition {
+    templates::recipe::acquisition(releases::source("2.12.1"))
+}
+fn hello_build() -> Build {
+    autotools_with_libc(BuildOptions {
+            source_directory = "hello-2.12.1";
+            timeout_seconds = 120;
+        })
+}
+fn hello_build_inputs() -> BuildInputs {
+    BuildInputs {
+        selected = [recipe_output(project::glibc, "dev"), recipe_output(project::glibc, "out")];
+    }
+}
+fn hello_command() -> Command {
+    Command {
+        name = "hello";
+        output = "out";
+        path = "usr/bin/hello";
+        loader = [RuntimeFile {
+                output = recipe_output(project::glibc, "out");
+                path = "usr/lib/ld-linux-x86-64.so.2";
+            }];
+        libraries = [recipe_output(project::glibc, "out")];
+    }
+}
+pub fn recipe() -> Recipe {
+    Recipe {
+        package = hello_package();
+        acquisition = Option::Some(hello_sources());
+        build = Option::Some(hello_build());
+        build_inputs = Option::Some(hello_build_inputs());
+        commands = [hello_command()];
+    }
+}

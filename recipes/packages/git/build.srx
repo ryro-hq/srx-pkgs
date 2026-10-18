@@ -1,0 +1,144 @@
+pub fn managed(
+    seed: lib::toolchain::Toolchain,
+    libc: RecipeRef<Recipe>,
+    zlib: RecipeRef<Recipe>,
+    runtime_tools: OutputRef<Recipe>,
+    source: support::Source
+) -> Recipe {
+    templates::recipe::from_source({
+            id = "git-minimal";
+            source = source;
+            build = program(source.version);
+            build_inputs = templates::recipe::selected_inputs(lib::toolchain::select_inputs(seed) ++ [
+                    recipe_output(libc, "dev"),
+                    recipe_output(libc, "out"),
+                    recipe_output(zlib, "dev"),
+                    recipe_output(zlib, "out"),
+                    runtime_tools
+                ]);
+            commands = [templates::recipe::gnu_command(
+                    "git",
+                    "usr/bin/git",
+                    libc,
+                    [recipe_output(zlib, "out")]
+                )];
+        })
+}
+fn program(version: PackagePinText) -> Build {
+    let cwd = BuildPath::Work("source/git-${version}");
+    Build {
+        profile = BuildProfile::Managed;
+        source_directory = "git-${version}";
+        source_format = BuildSourceFormat::Xz;
+        timeout_seconds = 1200;
+        steps = [
+            templates::process::run(
+                lib::toolchain::python("usr/bin/python3"),
+                BuildPath::Work(""),
+                [
+                    build_text("-I"),
+                    build_text("-c"),
+                    lib::runtime::static_validation(),
+                    build_path(lib::managed::git_tools("bin/sh")),
+                    build_path(lib::managed::git_tools("bin/cat"))
+                ],
+                lib::managed::script_environment()
+            ),
+            BuildStep::Extract(BuildPath::Work("source")),
+            // Upstream executes scripts directly; normalize their shebangs to the selected seed.
+            templates::process::run(
+                lib::toolchain::tools("usr/bin/sh"),
+                cwd,
+                [
+                    build_text("-eu"),
+                    build_text("-c"),
+                    build_text("find . -type f -exec sed -i \"1s|^#!/bin/sh$|#!$SYROX_BUILD_SHELL|\" {} +")
+                ],
+                lib::managed::script_environment()
+            ),
+            templates::process::run(
+                lib::toolchain::tools("usr/bin/make"),
+                cwd,
+                [
+                    build_text("-j2"),
+                    build_text("git"),
+                    build_join([
+                            BuildPart::Literal("CC="),
+                            BuildPart::Path(lib::toolchain::compiler("usr/bin/cc"))
+                        ]),
+                    build_join([
+                            BuildPart::Literal("AR="),
+                            BuildPart::Path(lib::toolchain::tools("usr/bin/ar"))
+                        ]),
+                    build_join([
+                            BuildPart::Literal("SHELL="),
+                            BuildPart::Path(lib::toolchain::tools("usr/bin/sh"))
+                        ]),
+                    build_join([
+                            BuildPart::Literal("SHELL_PATH="),
+                            BuildPart::Path(lib::toolchain::tools("usr/bin/sh"))
+                        ]),
+                    // Build scripts use the seed; installed helpers come from the separately checked static provider.
+                    build_join([
+                            BuildPart::Literal("SHELL_PATH_CQ=\""),
+                            BuildPart::Path(BuildPath::Installed(
+                                    "out",
+                                    "usr/libexec/git-minimal/sh"
+                                )),
+                            BuildPart::Literal("\"")
+                        ]),
+                    build_join([
+                            BuildPart::Literal("DEFAULT_PAGER="),
+                            BuildPart::Path(BuildPath::Installed(
+                                    "out",
+                                    "usr/libexec/git-minimal/cat"
+                                ))
+                        ]),
+                    build_join([
+                            BuildPart::Literal("prefix="),
+                            BuildPart::Path(BuildPath::Installed("out", "usr"))
+                        ]),
+                    build_join([
+                            BuildPart::Literal("ZLIB_PATH="),
+                            BuildPart::Path(lib::managed::zlib_dev("usr"))
+                        ]),
+                    BuildText {
+                        parts = [BuildPart::Literal("CFLAGS=")] ++ lib::managed::c_flags().parts;
+                    },
+                    BuildText {
+                        parts = [BuildPart::Literal("LDFLAGS=")] ++ lib::managed::linker_flags().parts ++ [
+                            BuildPart::Literal(" -L"),
+                            BuildPart::Path(lib::managed::zlib_out("usr/lib")),
+                            BuildPart::Literal(" -Wl,-rpath,"),
+                            BuildPart::Path(lib::managed::zlib_out("usr/lib"))
+                        ];
+                    },
+                    build_text("NO_CURL=YesPlease"),
+                    build_text("NO_EXPAT=YesPlease"),
+                    build_text("NO_OPENSSL=YesPlease"),
+                    build_text("NO_PERL=YesPlease"),
+                    build_text("NO_PYTHON=YesPlease"),
+                    build_text("NO_TCLTK=YesPlease"),
+                    build_text("NO_GETTEXT=YesPlease"),
+                    build_text("NO_ICONV=YesPlease"),
+                    build_text("NO_GITWEB=YesPlease")
+                ],
+                lib::managed::script_environment()
+            ),
+            BuildStep::Directory(BuildPath::Output("out", "usr/bin")),
+            BuildStep::Directory(BuildPath::Output("out", "usr/libexec/git-minimal")),
+            BuildStep::Copy(
+                BuildPath::Work("source/git-${version}/git"),
+                BuildPath::Output("out", "usr/bin/git")
+            ),
+            BuildStep::Copy(
+                lib::managed::git_tools("bin/sh"),
+                BuildPath::Output("out", "usr/libexec/git-minimal/sh")
+            ),
+            BuildStep::Copy(
+                lib::managed::git_tools("bin/cat"),
+                BuildPath::Output("out", "usr/libexec/git-minimal/cat")
+            ),
+        ];
+    }
+}

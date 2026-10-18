@@ -45,6 +45,8 @@ jobs:
             docker run --rm --user "$(id -u):$(id -g)" --dns-option single-request \
               --mount "type=bind,src=$PWD,dst=/catalog" \
               syrox-maintenance:ci /catalog/.core/target/catalog-candidate/srx catalog add /catalog "$name" "$version"
+            srx catalog generate . --check
+            srx catalog check .
             srx catalog lock . --check
             srx catalog matrix . > /tmp/syrox-new-matrix.json
             git add catalog.toml Catalog.lock Syrox.lock recipes changes

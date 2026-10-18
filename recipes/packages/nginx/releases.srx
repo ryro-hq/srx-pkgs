@@ -1,0 +1,49 @@
+// Generated from catalog.toml. Selection, construction and services belong to package modules.
+pub fn source(const version: PackagePinText) -> support::Source {
+    match version {
+        "1.30.5" => support::Source {
+            version = "1.30.5";
+            url = "https://nginx.org/download/nginx-1.30.5.tar.gz";
+            sha256 = "6c20565aa2325cb82216ae804f4a4ff1875179014759a381c42ddc8e11c4906d";
+            maximum_bytes = 2097152;
+        },
+        "1.30.6" => support::Source {
+            version = "1.30.6";
+            url = "https://nginx.org/download/nginx-1.30.6.tar.gz";
+            sha256 = "3cf46f5ed7504d460125866b7bea99fb357f31d887e2e63b35503310e9b8b6c8";
+            maximum_bytes = 2097152;
+        },
+    }
+}
+pub fn compatibility(
+    const version: PackagePinText,
+    const variant: PackagePinText,
+    const system: PackagePinText
+) -> support::Compatibility {
+    match version {
+        "1.30.5" => match variant {
+            "minimal" => match system {
+                "linux-x86_64-gnu" => support::Compatibility {
+                    id = "minimal";
+                    pin = "4b084e47aee9294d4fb02bbd7f70f1fe907e03021345eb48cb0ed302de6393ee";
+                },
+                "linux-x86_64-musl" => support::Compatibility {
+                    id = "minimal";
+                    pin = "4b084e47aee9294d4fb02bbd7f70f1fe907e03021345eb48cb0ed302de6393ee";
+                },
+            },
+        },
+        "1.30.6" => match variant {
+            "minimal" => match system {
+                "linux-x86_64-gnu" => support::Compatibility {
+                    id = "minimal";
+                    pin = "4b084e47aee9294d4fb02bbd7f70f1fe907e03021345eb48cb0ed302de6393ee";
+                },
+                "linux-x86_64-musl" => support::Compatibility {
+                    id = "minimal";
+                    pin = "4b084e47aee9294d4fb02bbd7f70f1fe907e03021345eb48cb0ed302de6393ee";
+                },
+            },
+        },
+    }
+}

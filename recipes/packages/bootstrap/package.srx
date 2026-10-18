@@ -1,0 +1,30 @@
+fn bootstrap_package() -> Package {
+    Package {
+        id = "bootstrap-glibc";
+        dependencies = [];
+    }
+}
+fn bootstrap_sources() -> Acquisition {
+    Acquisition {
+        sources = [source_request(
+                "project:assets/bootstrap-glibc-host-x86_64.tar.gz",
+                "09bede497713ef311ca7e35a24942b67faaf2beaa879c74d39b4e48defdb4941",
+                2097152,
+            )];
+    }
+}
+fn bootstrap_build() -> Build {
+    autotools(BuildOptions {
+            source_directory = "bootstrap-glibc-1";
+            timeout_seconds = 60;
+        })
+}
+pub fn recipe() -> Recipe {
+    Recipe {
+        package = bootstrap_package();
+        acquisition = Option::Some(bootstrap_sources());
+        build = Option::Some(bootstrap_build());
+        build_inputs = Option::None;
+        commands = [];
+    }
+}

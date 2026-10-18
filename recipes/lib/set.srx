@@ -1,0 +1,181 @@
+// Public package selection is separate from recipe support data.
+pub struct PackageSet {
+    platform: lib::platform::Platform;
+    buildPlatform: lib::platform::Platform;
+    // Legacy full tags remain available to existing forSystem callers.
+    resultSystem: PackagePinText;
+    toolsSystem: PackagePinText;
+}
+pub fn forPlatform(const selection: lib::platform::PlatformSelection) -> PackageSet {
+    let target = lib::platform::normalize(selection);
+    let tools = lib::platform::normalize({
+            system = "linux-x86_64";
+        });
+    PackageSet {
+        platform = target;
+        buildPlatform = tools;
+        resultSystem = lib::platform::tag(target);
+        toolsSystem = lib::platform::tag(tools);
+    }
+}
+pub fn forSystem(const system: PackagePinText) -> PackageSet {
+    forPlatform({
+            system = system;
+        })
+}
+fn require_same_platform(const requested: PackagePinText, const inherited: PackagePinText) -> PackagePinText {
+    match inherited {
+        "linux-x86_64-gnu" => match requested {
+            "linux-x86_64-gnu" => requested
+        },
+        "linux-x86_64-musl" => match requested {
+            "linux-x86_64-musl" => requested
+        },
+        "linux-aarch64-gnu" => match requested {
+            "linux-aarch64-gnu" => requested
+        },
+        "linux-aarch64-musl" => match requested {
+            "linux-aarch64-musl" => requested
+        },
+    }
+}
+// Public legacy fields remain readable. Validate them when a set selects a package,
+// including sets constructed explicitly instead of through forPlatform.
+fn checked_platform(const packages: PackageSet) -> lib::platform::Platform {
+    let result = require_same_platform(packages.resultSystem, lib::platform::tag(packages.platform));
+    let tools = require_same_platform(
+        lib::platform::tag(packages.buildPlatform),
+        "linux-x86_64-gnu"
+    );
+    match require_same_platform(packages.toolsSystem, tools) {
+        "linux-x86_64-gnu" => lib::platform::normalize({
+                system = result;
+            })
+    }
+}
+fn result_platform(const packages: PackageSet, const requested: lib::platform::PlatformSelection) -> lib::platform::Platform {
+    let inherited = checked_platform(packages);
+    let selected = lib::platform::normalize({
+            system = if requested.system == "" {
+                inherited.system
+            }
+            else {
+                requested.system
+            };
+            libc = if requested.libc == "" {
+                inherited.libc
+            }
+            else {
+                requested.libc
+            };
+        });
+    let checked = require_same_platform(lib::platform::tag(selected), lib::platform::tag(inherited));
+    lib::platform::normalize({
+            system = checked;
+        })
+}
+impl PackageSet {
+    fn nginx(const packages: Self, const selection: project::NginxSelection) -> _ {
+        project::nginx({
+                version = selection.version;
+                variant = selection.variant;
+                system = lib::platform::tag(result_platform(
+                        packages,
+                        {
+                            system = selection.system;
+                            libc = selection.libc;
+                        }
+                    ));
+            })
+    }
+    fn hello_version(const packages: Self, const selection: project::HelloSelection) -> _ {
+        project::hello_version({
+                version = selection.version;
+                variant = selection.variant;
+                system = lib::platform::tag(result_platform(
+                        packages,
+                        {
+                            system = selection.system;
+                            libc = selection.libc;
+                        }
+                    ));
+            })
+    }
+    fn glibc(const packages: Self, const selection: project::GlibcSelection) -> RecipeRef<Recipe> {
+        project::glibc_version({
+                version = selection.version;
+                system = lib::platform::tag(result_platform(
+                        packages,
+                        {
+                            system = selection.system;
+                            libc = selection.libc;
+                        }
+                    ));
+            })
+    }
+    fn managed_glibc(
+        const packages: Self,
+        const selection: project::GlibcSelection,
+        seed: lib::toolchain::Toolchain
+    ) -> RecipeRef<Recipe> {
+        project::managed_glibc_version(
+            {
+                version = selection.version;
+                system = lib::platform::tag(result_platform(
+                        packages,
+                        {
+                            system = selection.system;
+                            libc = selection.libc;
+                        }
+                    ));
+            },
+            seed
+        )
+    }
+    fn zlib(
+        const packages: Self,
+        const selection: project::ZlibSelection,
+        seed: lib::toolchain::Toolchain,
+        libc: RecipeRef<Recipe>
+    ) -> RecipeRef<Recipe> {
+        project::zlib_version(
+            {
+                version = selection.version;
+                system = lib::platform::tag(result_platform(
+                        packages,
+                        {
+                            system = selection.system;
+                            libc = selection.libc;
+                        }
+                    ));
+            },
+            seed,
+            libc
+        )
+    }
+    fn git(
+        const packages: Self,
+        const selection: project::GitSelection,
+        seed: lib::toolchain::Toolchain,
+        libc: RecipeRef<Recipe>,
+        zlib: RecipeRef<Recipe>,
+        runtime_tools: OutputRef<Recipe>
+    ) -> RecipeRef<Recipe> {
+        project::git_version(
+            {
+                version = selection.version;
+                system = lib::platform::tag(result_platform(
+                        packages,
+                        {
+                            system = selection.system;
+                            libc = selection.libc;
+                        }
+                    ));
+            },
+            seed,
+            libc,
+            zlib,
+            runtime_tools
+        )
+    }
+}

@@ -1,0 +1,77 @@
+// Experimental managed minimal HTTP build, with explicit seed and libc providers.
+pub fn managed_nginx(seed: lib::toolchain::Toolchain, libc: RecipeRef<Recipe>) -> Recipe {
+    templates::recipe::from_source({
+            id = "nginx-minimal";
+            source = releases::source("1.30.5");
+            build = program();
+            build_inputs = templates::recipe::selected_inputs(lib::toolchain::select_inputs(seed) ++ [
+                    recipe_output(libc, "dev"),
+                    recipe_output(libc, "out")
+                ]);
+            commands = [templates::recipe::gnu_command("nginx", "usr/bin/nginx", libc, [])];
+        })
+}
+fn program() -> Build {
+    let cwd = BuildPath::Work("source/nginx-1.30.5");
+    Build {
+        profile = BuildProfile::Managed;
+        source_directory = "nginx-1.30.5";
+        timeout_seconds = 600;
+        steps = [
+            BuildStep::Extract(BuildPath::Work("source")),
+            templates::process::run(
+                BuildPath::Input(4, "usr/bin/sh"),
+                cwd,
+                [
+                    build_text("configure"),
+                    build_join([
+                            BuildPart::Literal("--with-cc="),
+                            BuildPart::Path(BuildPath::Input(0, "usr/bin/cc"))
+                        ]),
+                    BuildText {
+                        parts = [BuildPart::Literal("--with-cc-opt=")] ++ lib::managed::c_flags().parts;
+                    },
+                    BuildText {
+                        parts = [BuildPart::Literal("--with-ld-opt=")] ++ lib::managed::linker_flags().parts;
+                    },
+                    build_join([
+                            BuildPart::Literal("--prefix="),
+                            BuildPart::Path(BuildPath::Installed("out", "usr"))
+                        ]),
+                    build_text("--without-http_rewrite_module"),
+                    build_text("--without-pcre"),
+                    build_text("--without-http_gzip_module"),
+                    build_text("--without-http_auth_basic_module"),
+                    build_text("--without-http-cache"),
+                    build_text("--error-log-path=stderr"),
+                    build_text("--http-log-path=/dev/stdout"),
+                    build_text("--pid-path=/tmp/nginx.pid"),
+                    build_text("--lock-path=/tmp/nginx.lock"),
+                    build_text("--http-client-body-temp-path=/tmp/client-body"),
+                    build_text("--http-proxy-temp-path=/tmp/proxy"),
+                    build_text("--http-fastcgi-temp-path=/tmp/fastcgi"),
+                    build_text("--http-uwsgi-temp-path=/tmp/uwsgi"),
+                    build_text("--http-scgi-temp-path=/tmp/scgi")
+                ],
+                lib::managed::script_environment()
+            ),
+            templates::process::run(
+                BuildPath::Input(4, "usr/bin/make"),
+                cwd,
+                [
+                    build_text("-j2"),
+                    build_join([
+                            BuildPart::Literal("SHELL="),
+                            BuildPart::Path(BuildPath::Input(4, "usr/bin/sh"))
+                        ])
+                ],
+                lib::managed::script_environment()
+            ),
+            BuildStep::Directory(BuildPath::Output("out", "usr/bin")),
+            BuildStep::Copy(
+                BuildPath::Work("source/nginx-1.30.5/objs/nginx"),
+                BuildPath::Output("out", "usr/bin/nginx")
+            ),
+        ];
+    }
+}

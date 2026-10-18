@@ -1,0 +1,10 @@
+pub struct Source {
+    version: PackagePinText;
+    url: SourceUrl;
+    sha256: SourceDigest;
+    maximum_bytes: SourceLimit;
+}
+pub struct Compatibility {
+    id: PackagePinText;
+    pin: PackagePinText;
+}

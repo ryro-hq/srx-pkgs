@@ -1,0 +1,14 @@
+{
+  "include": [
+    {
+      "host": "debian",
+      "base_image": "debian@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f",
+      "canonical": true
+    },
+    {
+      "host": "ubuntu-24.04",
+      "base_image": "ubuntu@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac",
+      "canonical": false
+    }
+  ]
+}

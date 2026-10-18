@@ -1,0 +1,14 @@
+// Experimental until this exact source and platform have native qualification.
+pub struct Selection {
+    version: PackagePinText = @{version};
+    system: PackagePinText = "";
+    libc: PackagePinText = "";
+}
+pub fn @{name}_version(const selection: Selection) -> RecipeRef<Recipe> {
+    let source = releases::source(selection.version);
+    let system = lib::platform::gnu_x86_64({system = selection.system; libc = selection.libc;});
+    recipe_ref(fn() -> Recipe {
+        templates::recipe::named_recipe(build::gnu(source), "@{name}-${source.version}-${system}")
+    })
+}
+pub fn recipe() -> Recipe { build::gnu(releases::source(@{version})) }

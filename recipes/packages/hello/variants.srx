@@ -1,0 +1,50 @@
+pub struct Gnu {
+    source: support::Source;
+    compatibility: support::Compatibility;
+}
+pub struct Musl {
+    source: support::Source;
+    compatibility: support::Compatibility;
+}
+impl package_traits::Package for Gnu {
+    type Settings = contracts::default::Settings;
+    fn reference(package: Self) -> PackageRef<Self::Settings> {
+        package_ref(
+            recipe_ref(fn() -> Recipe {
+                    build::gnu(package.source)
+                }),
+            package.source.version,
+            "default",
+            "linux-x86_64-gnu",
+            package.compatibility.pin,
+            contracts::default::render
+        )
+    }
+    fn recipe(package: Self) -> RecipeRef<Recipe> {
+        package_recipe(Self::reference(package))
+    }
+    fn render(package: Self, settings: Self::Settings) -> ConfigText {
+        contracts::default::render(settings)
+    }
+}
+impl package_traits::Package for Musl {
+    type Settings = contracts::default::Settings;
+    fn reference(package: Self) -> PackageRef<Self::Settings> {
+        package_ref(
+            recipe_ref(fn() -> Recipe {
+                    build::musl(package.source)
+                }),
+            package.source.version,
+            "default",
+            "linux-x86_64-musl",
+            package.compatibility.pin,
+            contracts::default::render
+        )
+    }
+    fn recipe(package: Self) -> RecipeRef<Recipe> {
+        package_recipe(Self::reference(package))
+    }
+    fn render(package: Self, settings: Self::Settings) -> ConfigText {
+        contracts::default::render(settings)
+    }
+}

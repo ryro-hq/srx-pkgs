@@ -1,0 +1,75 @@
+// GNU tools build against the selected libc. Configure probes use a private
+// executable loader copy; installed binaries retain the selected loader path.
+pub fn environment() -> [BuildEnv] {
+    compiler_environment("0")
+}
+pub fn configure_environment() -> [BuildEnv] {
+    compiler_environment("1")
+}
+fn compiler_environment(probe: BuildLiteral) -> [BuildEnv] {
+    [
+        templates::process::env("CC", build_path(BuildPath::Work("cc"))),
+        templates::process::env(
+            "CPP",
+            build_join([BuildPart::Path(BuildPath::Work("cc")), BuildPart::Literal(" -E")])
+        ),
+        templates::process::env("LIBC_DEV", build_path(BuildPath::Input(0, ""))),
+        templates::process::env("LIBC_OUT", build_path(BuildPath::Input(1, ""))),
+        templates::process::env("LIBRARY_PATH", build_path(BuildPath::Input(1, "usr/lib"))),
+        templates::process::env("CONFIGURE_PROBE", build_text(probe))
+    ]
+}
+pub fn setup() -> [BuildStep] {
+    [
+        BuildStep::Directory(BuildPath::Work("kernel-headers")),
+        templates::process::run(
+            BuildPath::Host("/bin/sh"),
+            BuildPath::Work("kernel-headers"),
+            [
+                build_text("-eu"),
+                build_text("-c"),
+                build_text("""triplet=$(/usr/bin/gcc -dumpmachine)
+for name in linux asm asm-generic; do
+ path=/usr/include/$name
+ if ! test -d "$path"; then path=/usr/include/$triplet/$name; fi
+ if test -d "$path"; then ln -s "$path" "$name"; fi
+done
+cp "$LIBC_OUT/usr/lib/ld-linux-x86-64.so.2" /work/ld.so
+chmod 500 /work/ld.so
+""")
+            ],
+            environment()
+        ),
+        BuildStep::Write(BuildFile {
+                path = BuildPath::Work("cc");
+                mode = BuildFileMode::Executable;
+                text = build_text("""#!/bin/sh
+set -eu
+include=$(/usr/bin/gcc -print-file-name=include)
+case "$include" in /usr/lib/gcc/*) ;; *) exit 1;; esac
+test -d "$include"
+loader="$LIBC_OUT/usr/lib/ld-linux-x86-64.so.2"
+if test "$CONFIGURE_PROBE" = 1; then loader=/work/ld.so; fi
+exec /usr/bin/gcc -B"$LIBC_DEV/usr/lib/" -nostdinc -isystem "$include" -isystem "$LIBC_DEV/usr/include" -isystem /work/kernel-headers -Wl,-L,"$LIBC_OUT/usr/lib" -Wl,--dynamic-linker="$loader" -Wl,--enable-new-dtags,-rpath,"$LIBC_OUT/usr/lib" "$@"
+""");
+            })
+    ]
+}
+pub fn autotools(options: BuildOptions) -> Build {
+    let prefix = [templates::process::env(
+            "SYROX_OUTPUT_PREFIX",
+            build_path(BuildPath::Installed("out", "usr"))
+        )];
+    templates::autotools::build({
+            directory = options.source_directory;
+            timeout_seconds = options.timeout_seconds;
+            before = setup();
+            configure = [
+                build_text("./configure"),
+                templates::process::argument("--prefix=", BuildPath::Installed("out", "usr")),
+                build_text("--disable-nls")
+            ];
+            environment = environment() ++ prefix;
+            configure_environment = Option::Some(configure_environment() ++ prefix);
+        })
+}

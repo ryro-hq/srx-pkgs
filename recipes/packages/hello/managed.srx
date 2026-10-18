@@ -1,0 +1,63 @@
+// Experimental managed factory; the seed and libc are supplied explicitly.
+pub fn managed_hello(seed: lib::toolchain::Toolchain, libc: RecipeRef<Recipe>) -> Recipe {
+    templates::recipe::from_source({
+            id = "hello-managed";
+            source = releases::source("2.12.1");
+            build = build({
+                    source_directory = "hello-2.12.1";
+                    timeout_seconds = 120;
+                });
+            build_inputs = templates::recipe::selected_inputs(lib::toolchain::select_inputs(seed) ++ [
+                    recipe_output(libc, "dev"),
+                    recipe_output(libc, "out")
+                ]);
+            commands = [templates::recipe::gnu_command("hello", "usr/bin/hello", libc, [])];
+        })
+}
+// Hello-specific configure helpers stay beside its package recipe.
+fn build(options: BuildOptions) -> Build {
+    let shell = templates::process::argument("SHELL=", lib::toolchain::tools("usr/bin/sh"));
+    let configure_environment = lib::managed::environment() ++ [
+        // Hello's configure can execute install-sh and conftest.make directly.
+        templates::process::env(
+            "INSTALL",
+            build_join([
+                    BuildPart::Path(lib::toolchain::tools("usr/bin/sh")),
+                    BuildPart::Literal(" "),
+                    BuildPart::Path(BuildPath::Work("source/${options.source_directory}/build-aux/install-sh")),
+                    BuildPart::Literal(" -c")
+                ])
+        ),
+        templates::process::env(
+            "MKDIR_P",
+            build_join([
+                    BuildPart::Path(lib::toolchain::tools("usr/bin/mkdir")),
+                    BuildPart::Literal(" -p")
+                ])
+        ),
+        templates::process::env(
+            "MAKE",
+            build_join([
+                    BuildPart::Path(lib::toolchain::tools("usr/bin/make")),
+                    BuildPart::Literal(" SHELL="),
+                    BuildPart::Path(lib::toolchain::tools("usr/bin/sh"))
+                ])
+        ),
+    ];
+    templates::autotools::build({
+            directory = options.source_directory;
+            timeout_seconds = options.timeout_seconds;
+            profile = BuildProfile::Managed;
+            shell = lib::toolchain::tools("usr/bin/sh");
+            make = lib::toolchain::tools("usr/bin/make");
+            configure = [
+                build_text("./configure"),
+                templates::process::argument("--prefix=", BuildPath::Installed("out", "usr")),
+                build_text("--disable-nls")
+            ];
+            environment = lib::managed::environment();
+            configure_environment = Option::Some(configure_environment);
+            make_arguments = [build_text("-j2"), shell];
+            install_arguments = [build_text("install"), build_text("DESTDIR=/out"), shell];
+        })
+}

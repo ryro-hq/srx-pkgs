@@ -1,0 +1,38 @@
+pub fn gnu(source: support::Source) -> Recipe {
+    templates::recipe::from_source({
+            id = "nginx";
+            source = source;
+            build = steps::build(
+                "nginx-${source.version}",
+                templates::process::argument("--with-cc=", BuildPath::Work("cc")),
+                lib::gnu::environment(),
+                lib::gnu::configure_environment(),
+                lib::gnu::setup(),
+                []
+            );
+            build_inputs = templates::recipe::selected_inputs([
+                    recipe_output(glibc::runtime, "dev"),
+                    recipe_output(glibc::runtime, "out")
+                ]);
+            commands = [templates::recipe::gnu_command("nginx", "usr/bin/nginx", glibc::runtime, [])];
+        })
+}
+pub fn musl(source: support::Source) -> Recipe {
+    templates::recipe::from_source({
+            id = "nginx";
+            source = source;
+            build = steps::build(
+                "nginx-${source.version}",
+                build_text("--with-cc=/usr/bin/musl-gcc"),
+                [],
+                [],
+                [],
+                [build_text("--with-ld-opt=-static")]
+            );
+            commands = [Command {
+                    name = "nginx";
+                    output = "out";
+                    path = "usr/bin/nginx";
+                }];
+        })
+}

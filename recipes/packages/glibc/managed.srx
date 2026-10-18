@@ -1,0 +1,157 @@
+// Experimental GNU factory; see docs/recipes.md for the explicit seed contract.
+pub fn managed_glibc(seed: lib::toolchain::Toolchain) -> Recipe {
+    build(seed, releases::source("2.44"))
+}
+pub fn build(seed: lib::toolchain::Toolchain, source: support::Source) -> Recipe {
+    templates::recipe::from_source({
+            id = "glibc-managed";
+            source = source;
+            build = program({
+                    source_directory = "glibc-${source.version}";
+                    timeout_seconds = 1800;
+                });
+            build_inputs = templates::recipe::selected_inputs(lib::toolchain::select_inputs(seed));
+        })
+}
+fn program(options: BuildOptions) -> Build {
+    let cwd = BuildPath::Work("build");
+    Build {
+        profile = BuildProfile::Managed;
+        source_directory = options.source_directory;
+        timeout_seconds = options.timeout_seconds;
+        resources = BuildResources::Large;
+        source_format = BuildSourceFormat::Xz;
+        produces = ["dev", "out"];
+        steps = [
+            BuildStep::Extract(BuildPath::Work("source")),
+            // The pinned source calls this script directly from Makerules and posix/Makefile.
+            templates::process::run(
+                lib::toolchain::python("usr/bin/python3"),
+                BuildPath::Work(""),
+                [
+                    build_text("-I"),
+                    build_text("-c"),
+                    build_text("""import os, pathlib, stat, sys
+path = pathlib.Path(sys.argv[1])
+shell = os.fsencode(sys.argv[2])
+header = b'#!' + shell + b'\\n'
+if not shell.startswith(b'/') or any(byte <= 32 or byte == 127 for byte in shell) or len(header) > 127:
+    raise SystemExit('invalid declared shell shebang')
+before = path.read_bytes()
+original = b'#! /bin/sh\\n'
+if not before.startswith(original):
+    raise SystemExit('unexpected glibc mkinstalldirs shebang')
+mode = stat.S_IMODE(path.stat().st_mode)
+path.write_bytes(header + before[len(original):])
+if stat.S_IMODE(path.stat().st_mode) != mode:
+    raise SystemExit('mkinstalldirs mode changed')
+"""),
+                    build_path(BuildPath::Work("source/${options.source_directory}/scripts/mkinstalldirs")),
+                    build_path(lib::toolchain::tools("usr/bin/sh"))
+                ],
+                environment(target_compiler())
+            ),
+            BuildStep::Directory(cwd),
+            templates::process::run(
+                lib::toolchain::tools("usr/bin/sh"),
+                cwd,
+                [
+                    build_path(BuildPath::Work("source/${options.source_directory}/configure")),
+                    build_join([
+                            BuildPart::Literal("--prefix="),
+                            BuildPart::Path(BuildPath::Installed("out", "usr"))
+                        ]),
+                    build_text("--disable-werror"),
+                    build_join([
+                            BuildPart::Literal("--with-headers="),
+                            BuildPart::Path(lib::toolchain::sysroot("usr/include"))
+                        ])
+                ],
+                environment(bootstrap_compiler()) ++ [templates::process::env(
+                        "INSTALL",
+                        build_join([
+                                BuildPart::Path(lib::toolchain::tools("usr/bin/sh")),
+                                BuildPart::Literal(" "),
+                                BuildPart::Path(BuildPath::Work("source/${options.source_directory}/scripts/install-sh")),
+                                BuildPart::Literal(" -c")
+                            ])
+                    )]
+            ),
+            templates::process::run(
+                lib::toolchain::tools("usr/bin/make"),
+                cwd,
+                [build_text("-j2"), make_shell(), make_cc(), make_build_cc()],
+                environment(target_compiler())
+            ),
+            templates::process::run(
+                lib::toolchain::tools("usr/bin/make"),
+                cwd,
+                [
+                    build_text("install"),
+                    build_text("DESTDIR=/out"),
+                    make_shell(),
+                    make_cc(),
+                    make_build_cc()
+                ],
+                environment(target_compiler())
+            )
+        ] ++ steps::finish(cwd, lib::toolchain::tools("usr/bin/sh"), environment(target_compiler()));
+    }
+}
+fn make_shell() -> BuildText {
+    build_join([BuildPart::Literal("SHELL="), BuildPart::Path(lib::toolchain::tools("usr/bin/sh"))])
+}
+fn make_cc() -> BuildText {
+    BuildText {
+        parts = [BuildPart::Literal("CC=")] ++ target_compiler().parts;
+    }
+}
+fn make_build_cc() -> BuildText {
+    BuildText {
+        parts = [BuildPart::Literal("BUILD_CC=")] ++ bootstrap_compiler().parts;
+    }
+}
+// Target links must not inherit the bootstrap interpreter or RUNPATH.
+fn target_compiler() -> BuildText {
+    build_join([
+            BuildPart::Path(lib::toolchain::compiler("usr/bin/gcc")),
+            BuildPart::Literal(" --sysroot="),
+            BuildPart::Path(lib::toolchain::sysroot("")),
+        ])
+}
+// Configure probes and build-only helper programs execute against the seed libc.
+fn bootstrap_compiler() -> BuildText {
+    build_join([
+            BuildPart::Path(lib::toolchain::compiler("usr/bin/gcc")),
+            BuildPart::Literal(" --sysroot="),
+            BuildPart::Path(lib::toolchain::sysroot("")),
+            BuildPart::Literal(" -Wl,--dynamic-linker="),
+            BuildPart::Path(lib::toolchain::sysroot("usr/lib/ld-linux-x86-64.so.2")),
+            BuildPart::Literal(" -Wl,--enable-new-dtags,-rpath,"),
+            BuildPart::Path(lib::toolchain::sysroot("usr/lib")),
+        ])
+}
+fn environment(cc: BuildText) -> [BuildEnv] {
+    lib::toolchain::compiler_environment() ++ [
+        templates::process::env("PATH", lib::toolchain::search_path()),
+        templates::process::env("SHELL", build_path(lib::toolchain::tools("usr/bin/sh"))),
+        templates::process::env("CONFIG_SHELL", build_path(lib::toolchain::tools("usr/bin/sh"))),
+        templates::process::env("CC", cc),
+        templates::process::env("BUILD_CC", bootstrap_compiler()),
+        templates::process::env("CFLAGS", build_text("-O2")),
+        templates::process::env("AWK", build_path(lib::toolchain::tools("usr/bin/gawk"))),
+        templates::process::env("BISON", build_path(lib::toolchain::tools("usr/bin/bison"))),
+        templates::process::env(
+            "BISON_PKGDATADIR",
+            build_path(lib::toolchain::tools("usr/share/bison"))
+        ),
+        templates::process::env("M4", build_path(lib::toolchain::tools("usr/bin/m4"))),
+        templates::process::env("PYTHON", build_path(lib::toolchain::python("usr/bin/python3"))),
+        templates::process::env("AR", build_path(lib::toolchain::tools("usr/bin/ar"))),
+        templates::process::env("AS", build_path(lib::toolchain::tools("usr/bin/as"))),
+        templates::process::env("LD", build_path(lib::toolchain::tools("usr/bin/ld"))),
+        templates::process::env("NM", build_path(lib::toolchain::tools("usr/bin/nm"))),
+        templates::process::env("RANLIB", build_path(lib::toolchain::tools("usr/bin/ranlib"))),
+        templates::process::env("LC_ALL", build_text("C")),
+    ]
+}
