@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "roles": [
+    "core",
+    "packaging",
+    "toolchain"
+  ],
+  "required_tests": [
+    "catalog-projection",
+    "packaging-content"
+  ]
+}

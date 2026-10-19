@@ -1,0 +1,6 @@
+# Existing operator-managed configuration.
+node-name: old-node # replaced for this host
+node-ip: 10.10.0.99
+cluster-init: true
+# This option is outside the typed subset and must survive editing.
+write-kubeconfig-mode: "0600"

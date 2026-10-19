@@ -129,11 +129,13 @@ jobs:
         with:
           name: environment-${{ matrix.host }}
           path: .environment/*
+          include-hidden-files: true
           if-no-files-found: error
       - uses: actions/upload-artifact@v7
         with:
           name: host-${{ matrix.host }}
           path: .environment/host-${{ matrix.host }}.json
+          include-hidden-files: true
           if-no-files-found: error
 
   qualify:
@@ -196,11 +198,13 @@ jobs:
           path: |
             .evidence/*.log
             .evidence/qualification-vm.json
+          include-hidden-files: true
           if-no-files-found: error
       - uses: actions/upload-artifact@v7
         with:
           name: qualification-${{ matrix.host }}-${{ matrix.identity }}
           path: .evidence/results/*
+          include-hidden-files: true
           if-no-files-found: error
 
   manifests:
@@ -233,6 +237,7 @@ jobs:
         with:
           name: canonical-release
           path: .release/*
+          include-hidden-files: true
           if-no-files-found: error
       - uses: actions/upload-artifact@v7
         with:
@@ -242,6 +247,7 @@ jobs:
             .release/qualification-${{ matrix.host }}.json
             .release/host-${{ matrix.host }}.json
             .release/*.${{ matrix.host }}.vm.json
+          include-hidden-files: true
           if-no-files-found: error
 
   success:
@@ -269,6 +275,7 @@ jobs:
         with:
           name: release
           path: .release/*
+          include-hidden-files: true
           if-no-files-found: error
 
   publish:

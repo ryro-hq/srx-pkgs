@@ -1,0 +1,19 @@
+inputs {
+    packages = "path:../packages";
+    cluster = "path:../shared";
+}
+fn settings() -> packages::Settings {
+    let shared = cluster::Cluster {};
+    packages::Settings {
+        nodeName = "server-02";
+        nodeIp = "10.10.0.11";
+        server = std::Option::Some(packages::ServerUrl("${shared.endpoint}"));
+        tokenFile = std::Option::Some(packages::TokenFile("${shared.tokenFile}"));
+    }
+}
+services.k3s = {
+    package = packages.k3s {
+        version = "1.37.1+k3s1";
+    };
+    settings = settings();
+};

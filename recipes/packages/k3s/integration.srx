@@ -1,0 +1,24 @@
+// Preparation only: no processes are registered for automatic activation.
+// The administrator supplies a protected token file separately on each node.
+pub fn k3s_service(tool: std::RecipeRef<std::Recipe>, configuration: std::ConfigText) -> std::Service {
+    std::Service {
+        id = "k3s";
+        files = [std::ConfigFile {
+                path = "k3s.yaml";
+                text = configuration;
+            }];
+        commands = [std::ServiceCommand {
+                name = "k3s-version";
+                command = std::recipe_command(tool, "k3s");
+                arguments = [std::CommandArgument::Literal("--version")];
+            }, std::ServiceCommand {
+                name = "server";
+                command = std::recipe_command(tool, "k3s");
+                arguments = [std::CommandArgument::Literal("server"), std::CommandArgument::Literal("--config"), std::CommandArgument::File("k3s.yaml")];
+            }, std::ServiceCommand {
+                name = "agent";
+                command = std::recipe_command(tool, "k3s");
+                arguments = [std::CommandArgument::Literal("agent"), std::CommandArgument::Literal("--config"), std::CommandArgument::File("k3s.yaml")];
+            },];
+    }
+}

@@ -1,0 +1,22 @@
+inputs {
+    packages = "path:../packages";
+}
+struct HostConfig {
+    name: packages::NodeName;
+    ip: packages::NodeIp;
+}
+fn settings() -> packages::Settings {
+    let host = std::toml::decode<HostConfig>(std::files::read_text("assets/host.toml"));
+    packages::Settings {
+        nodeName = host.name;
+        nodeIp = host.ip;
+        clusterInit = std::Option::Some(true);
+        tokenFile = std::Option::Some(packages::TokenFile("/etc/rancher/k3s/token"));
+    }
+}
+services.k3s = {
+    package = packages.k3s {
+        version = "1.37.1+k3s1";
+    };
+    settings = settings();
+};

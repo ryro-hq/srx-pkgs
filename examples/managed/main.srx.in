@@ -1,0 +1,48 @@
+// Authoring only. The referenced result must already be admitted to the explicit Store.
+inputs { recipes = "modules:recipes"; }
+fn toolchain() -> recipes::toolchain::Toolchain {
+    recipes::toolchain::Toolchain {
+        compiler = std::recipe_output(project::seed, "compiler");
+        python = std::recipe_output(project::seed, "python");
+        runtime = std::recipe_output(project::seed, "runtime");
+        sysroot = std::recipe_output(project::seed, "sysroot");
+        tools = std::recipe_output(project::seed, "tools");
+    }
+}
+mod factories {
+    mod seed {
+        pub fn recipe() -> std::Recipe {
+            std::Recipe {
+                package = std::Package { id = "managed-seed"; dependencies = []; };
+                imported = std::Option::Some(std::ImportedResult {
+                    root = "@SEED_ROOT@";
+                    manifest = "@SEED_MANIFEST@";
+                    entries = [
+                        std::ImportedOutput { output = "compiler"; key = "compiler"; },
+                        std::ImportedOutput { output = "python"; key = "python"; },
+                        std::ImportedOutput { output = "runtime"; key = "runtime"; },
+                        std::ImportedOutput { output = "sysroot"; key = "sysroot"; },
+                        std::ImportedOutput { output = "tools"; key = "tools"; }
+                    ];
+                });
+            }
+        }
+    }
+    mod glibc {
+        pub fn recipe() -> std::Recipe {
+            recipes::managed_glibc::managed_glibc(project::toolchain())
+        }
+    }
+    mod hello {
+        pub fn recipe() -> std::Recipe {
+            recipes::managed_hello::managed_hello(project::toolchain(), project::glibc)
+        }
+    }
+}
+pub publish(factories, recipe): std::Recipe;
+outputs {
+    shell: std::Shell = std::Shell {
+        pkgs = [std::select_command(hello, "out", "hello")];
+        services = [];
+    };
+}

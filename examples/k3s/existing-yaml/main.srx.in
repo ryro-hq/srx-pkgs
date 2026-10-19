@@ -1,0 +1,21 @@
+inputs {
+    packages = "path:../packages";
+}
+fn configuration() -> std::ConfigText {
+    let original = std::yaml::document<packages::Settings>(std::files::read_text("assets/k3s.yaml"));
+    let updated = std::yaml::patch(original, {
+            nodeName = "server-03";
+            nodeIp = "10.10.0.12";
+        });
+    std::yaml::render(updated)
+}
+outputs {
+    os: std::Os = {
+        pkgs = [];
+        services = [packages::k3s_service(std::package_recipe(packages::k3s({})), configuration())];
+    };
+    dev: std::Shell = {
+        pkgs = [std::select_command(std::package_recipe(packages::k3s({})), "out", "k3s")];
+        services = [];
+    };
+}

@@ -1,0 +1,5 @@
+[build]
+host-toolchain = "/usr"
+
+[network]
+allow-https = ["https://github.com/k3s-io/k3s/releases/download/v1.37.1%2Bk3s1/k3s"]

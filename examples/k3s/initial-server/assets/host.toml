@@ -1,0 +1,3 @@
+# Host-specific data, independent of the cluster's shared configuration.
+name = "server-01"
+ip = "10.10.0.10"

@@ -1,0 +1,82 @@
+// Test-only functional probes. No source bootstrap or catalogue package claim.
+pub fn probe(toolchain: toolchain::Toolchain, source: std::SourceRequest) -> std::Recipe {
+    std::Recipe {
+        package = std::Package { id = "seed-functional-probe"; dependencies = []; };
+        acquisition = std::Option::Some(std::Acquisition { sources = [source]; });
+        build_inputs = std::Option::Some(std::BuildInputs { selected = toolchain::select_inputs(toolchain); });
+        build = std::Option::Some(std::Build {
+            profile = std::BuildProfile::Managed; source_directory = "probe";
+            source_format = std::BuildSourceFormat::Raw; timeout_seconds = 120;
+            steps = [
+                std::BuildStep::Copy(std::BuildPath::Source, std::BuildPath::Work("probe.c")),
+                compile("probe.c", "probe"),
+                // Configure executes conftest directly: do not bypass PT_INTERP/RUNPATH.
+                std::BuildStep::Run(std::BuildProcess {
+                    executable = std::BuildPath::Work("probe"); directory = std::BuildPath::Work("");
+                    arguments = []; environment = environment();
+                }),
+                std::BuildStep::Write(std::BuildFile { path = std::BuildPath::Work("grammar.y");
+                    text = std::build_text("%{\nint yylex(void); void yyerror(const char *s);\n%}\n%%\ninput: 'x';\n%%\nstatic int token;\nint yylex(void) { return token++ == 0 ? 'x' : 0; }\nvoid yyerror(const char *s) { (void)s; }\nint main(void) { return yyparse(); }\n"); }),
+                std::BuildStep::Run(std::BuildProcess {
+                    executable = std::BuildPath::Input(4, "usr/bin/bison"); directory = std::BuildPath::Work("");
+                    environment = environment() ++ [
+                        std::BuildEnv { name = "BISON_PKGDATADIR"; text = std::build_path(std::BuildPath::Input(4, "usr/share/bison")); },
+                        std::BuildEnv { name = "M4"; text = std::build_path(std::BuildPath::Input(4, "usr/bin/m4")); }
+                    ];
+                    arguments = [std::build_join([std::BuildPart::Literal("--skeleton="), std::BuildPart::Path(std::BuildPath::Input(4, "usr/share/bison/skeletons/yacc.c"))]),
+                        std::build_text("-o"), std::build_path(std::BuildPath::Work("parser.c")), std::build_path(std::BuildPath::Work("grammar.y"))];
+                }),
+                compile("parser.c", "parser"), run("parser"),
+                std::BuildStep::Run(std::BuildProcess {
+                    executable = std::BuildPath::Input(1, "usr/bin/python3"); directory = std::BuildPath::Work(""); environment = environment();
+                    arguments = [std::build_text("-I"), std::build_text("-c"),
+                        std::build_text("import encodings, json, pathlib, sys\nroot = pathlib.Path(sys.argv[1]).resolve()\nfor module in (encodings, json, pathlib):\n    path = pathlib.Path(module.__file__).resolve()\n    assert path.is_relative_to(root), str(path)\nassert json.loads(json.dumps({'probe': [1, 2, 3]})) == {'probe': [1, 2, 3]}\n"),
+                        std::build_path(std::BuildPath::Input(1, ""))];
+                }),
+                std::BuildStep::Write(std::BuildFile { path = std::BuildPath::Work("probe.pl"); text = std::build_text(__PERL_PROBE_LITERAL__); }),
+                std::BuildStep::Run(std::BuildProcess {
+                    executable = std::BuildPath::Input(4, "usr/bin/perl"); directory = std::BuildPath::Work("");
+                    environment = environment();
+                    arguments = [std::build_path(std::BuildPath::Work("probe.pl")), std::build_path(std::BuildPath::Input(4, ""))];
+                }),
+                perl_check("usr/bin/gp-display-html"), perl_check("usr/bin/gprofng-display-html"),
+                // The worker must require every preceding exit status to be zero.
+                std::BuildStep::Write(std::BuildFile { path = std::BuildPath::Output("out", "probe.ok"); text = std::build_text("compiler+parser+stdlib+perl passed\n"); }),
+            ];
+        });
+        commands = [];
+    }
+}
+fn environment() -> [std::BuildEnv] {
+    toolchain::perl_environment() ++ [std::BuildEnv { name = "PATH"; text = std::build_join([std::BuildPart::Path(std::BuildPath::Input(0, "usr/bin")), std::BuildPart::Literal(":"), std::BuildPart::Path(std::BuildPath::Input(4, "usr/bin")), std::BuildPart::Literal(":"), std::BuildPart::Path(std::BuildPath::Input(1, "usr/bin"))]); },
+     std::BuildEnv { name = "GCC_EXEC_PREFIX"; text = std::build_join([std::BuildPart::Path(std::BuildPath::Input(0, "usr/lib/gcc/x86_64-pc-linux-gnu/16")), std::BuildPart::Literal("/")]); },
+     std::BuildEnv { name = "COMPILER_PATH"; text = std::build_join([std::BuildPart::Path(std::BuildPath::Input(0, "usr/lib/gcc/x86_64-pc-linux-gnu/16")), std::BuildPart::Literal(":"), std::BuildPart::Path(std::BuildPath::Input(4, "usr/bin"))]); },
+     std::BuildEnv { name = "LC_ALL"; text = std::build_text("C"); }]
+}
+fn compile(source: std::BuildRelativePath, executable: std::BuildRelativePath) -> std::BuildStep {
+    std::BuildStep::Run(std::BuildProcess {
+        executable = std::BuildPath::Input(0, "usr/bin/gcc"); directory = std::BuildPath::Work(""); environment = environment();
+        arguments = [std::build_text("-O0"),
+            std::build_join([std::BuildPart::Literal("--sysroot="), std::BuildPart::Path(std::BuildPath::Input(3, ""))]),
+            std::build_join([std::BuildPart::Literal("-B"), std::BuildPart::Path(std::BuildPath::Input(3, "usr/lib")), std::BuildPart::Literal("/")]),
+            std::build_text("-isystem"), std::build_path(std::BuildPath::Input(3, "usr/include")),
+            std::build_join([std::BuildPart::Literal("-Wl,--dynamic-linker="), std::BuildPart::Path(std::BuildPath::Input(3, "usr/lib/ld-linux-x86-64.so.2"))]),
+            std::build_join([std::BuildPart::Literal("-Wl,--enable-new-dtags,-rpath,"), std::BuildPart::Path(std::BuildPath::Input(3, "usr/lib"))]),
+            std::build_path(std::BuildPath::Work(source)), std::build_path(std::BuildPath::Input(0, "usr/lib/gcc/x86_64-pc-linux-gnu/16/libgcc.a")),
+            std::build_text("-o"), std::build_path(std::BuildPath::Work(executable))];
+    })
+}
+fn run(executable: std::BuildRelativePath) -> std::BuildStep {
+    std::BuildStep::Run(std::BuildProcess {
+        executable = std::BuildPath::Input(3, "usr/lib/ld-linux-x86-64.so.2"); directory = std::BuildPath::Work(""); environment = environment();
+        arguments = [std::build_text("--library-path"), std::build_path(std::BuildPath::Input(3, "usr/lib")), std::build_path(std::BuildPath::Work(executable))];
+    })
+}
+
+// Syntax/module loading only; qx and the script's complete execution remain unproved.
+fn perl_check(script: std::BuildRelativePath) -> std::BuildStep {
+    std::BuildStep::Run(std::BuildProcess {
+        executable = std::BuildPath::Input(4, "usr/bin/perl"); directory = std::BuildPath::Work("");
+        environment = environment(); arguments = [std::build_text("-c"), std::build_path(std::BuildPath::Input(4, script))];
+    })
+}

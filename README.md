@@ -170,3 +170,7 @@ compatible entry points. The [managed seed contract](docs/recipes.md#managed-see
 documents the required explicit providers; no admitted managed seed is published.
 
 Licensed under [Apache-2.0](LICENSE).
+
+## K3s
+
+K3s `1.37.1+k3s1` uses the official checksum-pinned Linux amd64 binary and a typed YAML contract. Server bootstrap, joining server, agent and comment-preserving YAML examples are in `examples/k3s`. Validate them without starting a cluster with `python3 examples/k3s/check.py --srx /path/to/srx`. Preparation does not activate services or provision hosts.

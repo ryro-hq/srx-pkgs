@@ -1,0 +1,41 @@
+// Official static Linux amd64 binary, verified against sha256sum-amd64.txt.
+pub struct Selection {
+    version: PackagePinText = "1.37.1+k3s1";
+}
+pub fn k3s(const selection: Selection) -> PackageRef<contracts::default::Settings> {
+    match selection.version { "1.37.1+k3s1" => reference() }
+}
+fn reference() -> PackageRef<contracts::default::Settings> {
+    std::with_package_service(std::package_ref(std::recipe_ref(raw_recipe), "1.37.1+k3s1", "binary", "linux-x86_64-gnu", "4b61a63d878559c2acc5cb74ad85312b86b0f719d7a1afcc8a75c43966c347ab", contracts::default::render), integration::k3s_service)
+}
+pub fn recipe() -> std::Recipe {
+    std::recipe_value(std::package_recipe(k3s({})))
+}
+fn raw_recipe() -> std::Recipe {
+    std::Recipe {
+        package = std::Package {
+            id = "k3s";
+            dependencies = [];
+        };
+        acquisition = std::Option::Some(std::Acquisition {
+                sources = [std::source_request("https://github.com/k3s-io/k3s/releases/download/v1.37.1%2Bk3s1/k3s", "92b94582eb7b34a8cf532e6006842b9ed215a6783cf56a3dd6271fd35243b2c0", 83886080)];
+            });
+        build = std::Option::Some(std::Build {
+                profile = std::BuildProfile::HostBootstrap;
+                resources = std::BuildResources::Large;
+                source_format = std::BuildSourceFormat::Raw;
+                source_directory = "k3s";
+                timeout_seconds = 60;
+                steps = [std::BuildStep::Directory(std::BuildPath::Work("job")), std::BuildStep::Directory(std::BuildPath::Output("out", "usr/bin")), std::BuildStep::Copy(std::BuildPath::Source, std::BuildPath::Output("out", "usr/bin/k3s")), std::BuildStep::Run(std::BuildProcess {
+                            executable = std::BuildPath::Host("/usr/bin/chmod");
+                            directory = std::BuildPath::Work("job");
+                            arguments = [std::build_text("755"), std::build_path(std::BuildPath::Output("out", "usr/bin/k3s"))];
+                        }),];
+            });
+        commands = [std::Command {
+                name = "k3s";
+                output = "out";
+                path = "usr/bin/k3s";
+            }];
+    }
+}

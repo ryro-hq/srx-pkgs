@@ -1,0 +1,61 @@
+Maintenance inventory: local reconciliation, not publication authority
+
+maintenance.json classifies the three current zero-argument official exports:
+bootstrap, glibc and hello. Parameterized Managed factories and helper modules
+are not silently counted as independently consumable official packages.
+The engine's locked catalog_names() discovers declared typed publication keys without
+executing recipe factories. No textual filename/regex inventory is substituted.
+Version/source pins remain authoritative in the recipes and Syrox.lock; this
+maintenance document does not copy them into a competing version database.
+
+The checker takes three explicit documents and independent SHA256 arguments:
+policy, accepted base inventory, and proposed inventory. The caller must obtain
+accepted policy/base pins from its trusted review context. Supplying a hash
+only identifies bytes; it neither authenticates a human nor proves the caller
+selected an authorized baseline. The proposed checkout does not choose the
+policy/base automatically. scripts/fixtures/maintenance-policy.json is an
+initial REVIEWABLE LOCAL policy, not a deployed organization policy or a claim
+that named GitHub teams exist. Every owner currently remains unassigned.
+
+Policy v1: version=1, roles (logical routing labels), required_tests (nonempty).
+Inventory v1: version=1, packages (nonempty, at most 1024). Each record declares
+export, categories, roles, tests, owners, discovery={mode:"manual",reason:...}.
+Owners are unverified identity declarations only. Discovery automation is not
+implemented. Names and arrays are bounded; unknown fields, duplicate fields,
+duplicate records/names, unsupported versions, malformed pins, symlink/FIFO
+input documents and documents larger than 1MiB are refused. Reads verify bytes
+against explicit pins and stable inode metadata. No scripts from those inputs
+are executed.
+
+The checker requires exact locked catalog identity and exact export coverage.
+It blocks missing/stale records, removal of base records/tests/roles, required
+test omissions and changed category/discovery policy. Additive records may
+structurally reconcile but never confer review or publication authority.
+The 'tests' values are requirements, NOT assertions that those tests exist,
+ran or passed: bootstrap-provenance and other runtime/host requirements remain
+pending until a separate evidence aggregator verifies their actual executions.
+
+JSON output is deterministic for set/order-independent input. inventory_consistent
+means structural coverage/base constraints only. needs_owner and
+ownership_declared distinguish absent versus unverified declarations.
+membership_verification is always pending. authorized and promotion_ready are
+always false, including with nonempty owners. Exit 0 means reconciliation was
+consistent, NOT ready to publish; exit 2 accompanies coverage/base violations;
+exit 1 means malformed inputs or locked project failure.
+
+Reproducible isolated build/test (paths are explicitly chosen by the caller):
+  python3 scripts/check-maintenance.py --core /absolute/syrox \
+    --harness-directory /absolute/new-harness \
+    --target-directory /absolute/separate-cargo-target --test
+
+Run with the same runner, a fresh harness directory, without --test, followed by:
+  -- --catalog /absolute/catalog --lock-sha256 LOCK_PIN \
+     --policy /absolute/accepted-policy.json --policy-sha256 POLICY_PIN \
+     --base /absolute/accepted-inventory.json --base-sha256 BASE_PIN \
+     --inventory /absolute/proposed/maintenance.json --inventory-sha256 NEW_PIN
+
+The runner builds against the explicitly supplied local core, offline, using
+its Cargo.lock and bundled std. It records checker source hash; core source is
+not asserted to be a release revision. No Store, package build, network fetch,
+bot, GitHub API, membership verifier, CI check issuer, signer, publisher or
+promotion is implemented by this increment. No human approval is inferred.

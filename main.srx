@@ -69,3 +69,10 @@ pub type HelloSelection = catalog::packages::hello::Selection;
 pub type GlibcSelection = catalog::packages::glibc::Selection;
 pub type GitSelection = catalog::packages::git::Selection;
 pub type ZlibSelection = catalog::packages::zlib::Selection;
+
+// K3s configuration and package preparation; privileged activation is separate.
+pub use catalog::packages::k3s::k3s;
+pub use catalog::packages::k3s::contracts::default::{Settings, NodeName, NodeIp, ServerUrl, TokenFile};
+pub use catalog::packages::k3s::integration::k3s_service;
+pub type K3sSelection = catalog::packages::k3s::Selection;
+pub let versioned_k3s_1_37_1_gnu = package_recipe(k3s({}));
