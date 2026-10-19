@@ -15,7 +15,7 @@ runs:
         echo "sha=$sha" >> "$GITHUB_OUTPUT"
     - uses: actions/checkout@v7
       with:
-        repository: ryro-hq/syrox
+        repository: ryro-hq/srx
         ref: ${{ steps.pin.outputs.sha }}
         path: .core
         persist-credentials: false
