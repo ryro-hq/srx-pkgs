@@ -173,4 +173,39 @@ Licensed under [Apache-2.0](LICENSE).
 
 ## K3s
 
-K3s `1.37.1+k3s1` uses the official checksum-pinned Linux amd64 binary and a typed YAML contract. Server bootstrap, joining server, agent and comment-preserving YAML examples are in `examples/k3s`. Validate them without starting a cluster with `python3 examples/k3s/check.py --srx /path/to/srx`. Preparation does not activate services or provision hosts.
+K3s `1.37.1+k3s1` uses the official checksum-pinned Linux amd64 binary and a
+nominal YAML settings contract. It is available directly as `pkgs.k3s` or from
+a GNU x86_64 package set:
+
+```srx
+inputs { pkgs = "path:../srx-pkgs"; }
+let packages = pkgs.forPlatform { system = "linux-x86_64"; };
+services.k3s = {
+    package = packages.k3s { version = "1.37.1+k3s1"; };
+    settings = {
+        nodeName = "notebook-test";
+        nodeIp = "192.168.1.50";
+        clusterInit = Some(true);
+        tokenFile = Some("/etc/rancher/k3s/token");
+        disable = Some(["traefik", "servicelb", "metrics-server"]);
+    };
+};
+```
+
+Use the notebook's own address for `nodeIp`. Supply the protected token file
+separately. Preparation renders `k3s.yaml` and explicit version/server/agent
+commands; it does not start processes or activate a privileged cluster.
+
+`examples/k3s` contains an initial server reading host data from locked TOML,
+a joining server, an agent, and an existing YAML document patched while retaining
+comments and unknown settings. Materialize the examples as sibling projects and
+check their format, types, locks and plans without starting a cluster:
+
+```sh
+python3 examples/k3s/prepare.py /tmp/srx-k3s-examples
+python3 examples/k3s/check.py --srx /path/to/srx
+```
+
+K3s is a preparation example. The catalog's six application qualification rows
+continue to cover Hello and nginx; K3s cluster activation and provisioning are
+separate operations.
