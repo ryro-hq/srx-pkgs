@@ -7,18 +7,30 @@ pub fn k3s_service(tool: std::RecipeRef<std::Recipe>, configuration: std::Config
                 path = "k3s.yaml";
                 text = configuration;
             }];
-        commands = [std::ServiceCommand {
+        commands = [
+            std::ServiceCommand {
                 name = "k3s-version";
                 command = std::recipe_command(tool, "k3s");
                 arguments = [std::CommandArgument::Literal("--version")];
-            }, std::ServiceCommand {
+            },
+            std::ServiceCommand {
                 name = "server";
                 command = std::recipe_command(tool, "k3s");
-                arguments = [std::CommandArgument::Literal("server"), std::CommandArgument::Literal("--config"), std::CommandArgument::File("k3s.yaml")];
-            }, std::ServiceCommand {
+                arguments = [
+                    std::CommandArgument::Literal("server"),
+                    std::CommandArgument::Literal("--config"),
+                    std::CommandArgument::File("k3s.yaml")
+                ];
+            },
+            std::ServiceCommand {
                 name = "agent";
                 command = std::recipe_command(tool, "k3s");
-                arguments = [std::CommandArgument::Literal("agent"), std::CommandArgument::Literal("--config"), std::CommandArgument::File("k3s.yaml")];
-            },];
+                arguments = [
+                    std::CommandArgument::Literal("agent"),
+                    std::CommandArgument::Literal("--config"),
+                    std::CommandArgument::File("k3s.yaml")
+                ];
+            },
+        ];
     }
 }

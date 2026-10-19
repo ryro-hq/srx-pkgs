@@ -80,7 +80,6 @@ impl PackageSet {
             "linux-x86_64-gnu" => project::k3s(selection)
         }
     }
-
     fn nginx(const packages: Self, const selection: project::NginxSelection) -> _ {
         project::nginx({
                 version = selection.version;

@@ -55,6 +55,7 @@ jobs:
           python3 tests/check-platforms.py "$(command -v srx)"
           python3 tests/check-toolchains.py "$(command -v srx)"
           python3 tests/test-qualification-hosts.py
+          python3 examples/k3s/check.py --srx "$(command -v srx)"
           srx catalog generate . --check
           srx catalog check .
           srx catalog lock . --check
