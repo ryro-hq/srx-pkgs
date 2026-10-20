@@ -206,6 +206,10 @@ python3 examples/k3s/prepare.py /tmp/srx-k3s-examples
 python3 examples/k3s/check.py --srx /path/to/srx
 ```
 
+`examples/k3s/build.toml` grants the exact source URL and explicitly authorizes
+GitHub's release CDN as a redirect origin. The pinned digest still authenticates
+the downloaded bytes.
+
 K3s is a preparation example. The catalog's six application qualification rows
 continue to cover Hello and nginx; K3s cluster activation and provisioning are
 separate operations.
