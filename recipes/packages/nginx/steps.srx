@@ -1,0 +1,72 @@
+pub fn build(
+    directory: SourceDirectory,
+    compiler: BuildText,
+    environment: [BuildEnv],
+    configure_environment: [BuildEnv],
+    before: [BuildStep],
+    static_link: [BuildText]
+) -> Build {
+    let cwd = BuildPath::Work("source/${directory}");
+    Build {
+        profile = BuildProfile::HostBootstrap;
+        source_directory = directory;
+        timeout_seconds = 600;
+        steps = [BuildStep::Extract(BuildPath::Work("source"))] ++ before ++ [
+            // The runtime has already dropped capabilities and maps its owner
+            // to namespace UID 0. nginx must retain that owner, as it does for
+            // ordinary non-root execution, without consulting host passwd data.
+            templates::process::run(
+                BuildPath::Host("/bin/sh"),
+                cwd,
+                [
+                    build_text("-eu"),
+                    build_text("-c"),
+                    build_text("""grep -Fq 'geteuid() == 0' src/core/nginx.c
+grep -Fq 'geteuid() != 0' src/core/nginx.c
+grep -Fq 'geteuid() == 0' src/os/unix/ngx_process_cycle.c
+sed -i 's/geteuid() == 0/0/g; s/geteuid() != 0/1/g' src/core/nginx.c src/os/unix/ngx_process_cycle.c
+""")
+                ],
+                []
+            ),
+            templates::process::run(
+                BuildPath::Host("/bin/sh"),
+                cwd,
+                [
+                    build_text("configure"),
+                    compiler,
+                    build_join([
+                            BuildPart::Literal("--prefix="),
+                            BuildPart::Path(BuildPath::Installed("out", "usr"))
+                        ]),
+                    build_text("--without-http_rewrite_module"),
+                    build_text("--without-pcre"),
+                    build_text("--without-http_gzip_module"),
+                    build_text("--without-http_auth_basic_module"),
+                    build_text("--without-http-cache"),
+                    build_text("--error-log-path=stderr"),
+                    build_text("--http-log-path=/tmp/nginx-access.log"),
+                    build_text("--pid-path=/tmp/nginx.pid"),
+                    build_text("--lock-path=/tmp/nginx.lock"),
+                    build_text("--http-client-body-temp-path=/tmp/client-body"),
+                    build_text("--http-proxy-temp-path=/tmp/proxy"),
+                    build_text("--http-fastcgi-temp-path=/tmp/fastcgi"),
+                    build_text("--http-uwsgi-temp-path=/tmp/uwsgi"),
+                    build_text("--http-scgi-temp-path=/tmp/scgi")
+                ] ++ static_link,
+                configure_environment
+            ),
+            templates::process::run(
+                BuildPath::Host("/usr/bin/make"),
+                cwd,
+                [build_text("-j2")],
+                environment
+            ),
+            BuildStep::Directory(BuildPath::Output("out", "usr/bin")),
+            BuildStep::Copy(
+                BuildPath::Work("source/${directory}/objs/nginx"),
+                BuildPath::Output("out", "usr/bin/nginx")
+            ),
+        ];
+    }
+}

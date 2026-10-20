@@ -1,0 +1,23 @@
+pub struct Selection {
+    version: PackagePinText = "1.30.5";
+    variant: PackagePinText = "minimal";
+    system: PackagePinText = "";
+    libc: PackagePinText = "";
+}
+pub fn nginx(const selection: Selection) -> _ {
+    let target = lib::platform::direct({
+            system = selection.system;
+            libc = selection.libc;
+        });
+    let system = lib::platform::tag(target);
+    let source = releases::source(selection.version);
+    let compatibility = releases::compatibility(selection.version, selection.variant, system);
+    match compatibility.id {
+        "minimal" => match target.system {
+            "linux-x86_64" => match target.libc {
+                "gnu" => variants::gnu(source, compatibility),
+                "musl" => variants::musl(source, compatibility),
+            }
+        }
+    }
+}

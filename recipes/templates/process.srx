@@ -1,0 +1,23 @@
+// Values remain typed Build IR. Arguments and paths are never shell-expanded.
+pub fn run(
+    executable: BuildPath,
+    directory: BuildPath,
+    arguments: [BuildText],
+    environment: [BuildEnv]
+) -> BuildStep {
+    BuildStep::Run(BuildProcess {
+            executable = executable;
+            directory = directory;
+            arguments = arguments;
+            environment = environment;
+        })
+}
+pub fn env(name: BuildEnvName, text: BuildText) -> BuildEnv {
+    BuildEnv {
+        name = name;
+        text = text;
+    }
+}
+pub fn argument(prefix: BuildLiteral, path: BuildPath) -> BuildText {
+    build_join([BuildPart::Literal(prefix), BuildPart::Path(path)])
+}

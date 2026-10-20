@@ -1,0 +1,25 @@
+// Keep source provenance, settings and service integration in one typed record.
+pub struct Definition<C> {
+    source: support::Source;
+    compatibility: support::Compatibility;
+    system: PackagePinText;
+    build: fn(support::Source) -> Recipe;
+    render: fn(C) -> ConfigText;
+    integrate: Option<fn(RecipeRef<Recipe>, ConfigText) -> Service> = Option::None;
+}
+pub fn reference<C>(definition: Definition<C>) -> PackageRef<C> {
+    let package = package_ref<C>(
+        recipe_ref<Recipe>(fn() -> Recipe {
+                definition.build(definition.source)
+            }),
+        definition.source.version,
+        definition.compatibility.id,
+        definition.system,
+        definition.compatibility.pin,
+        definition.render
+    );
+    match definition.integrate {
+        None => package,
+        Some(integrate) => with_package_service<C>(package, integrate),
+    }
+}

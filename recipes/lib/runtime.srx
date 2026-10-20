@@ -1,0 +1,65 @@
+// ELF shape validation only; does not execute the supplied shell or pager.
+pub fn static_validation() -> BuildText {
+    build_text("""import os, stat, struct, sys
+
+def validate(path):
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    with os.fdopen(fd, 'rb') as source:
+        before = os.fstat(source.fileno())
+        if not stat.S_ISREG(before.st_mode) or not before.st_mode & 0o111 or not 64 <= before.st_size <= 134217728:
+            raise ValueError('runtime helper must be a bounded executable regular file')
+        def read(offset, size):
+            if offset < 0 or size < 0 or offset + size > before.st_size:
+                raise ValueError('ELF range')
+            source.seek(offset)
+            data = source.read(size)
+            if len(data) != size:
+                raise ValueError('truncated ELF')
+            return data
+        header = read(0, 64)
+        if header[:7] != b'\\x7fELF\\x02\\x01\\x01':
+            raise ValueError('ELF64 little endian required')
+        kind, machine, version = struct.unpack_from('<HHI', header, 16)
+        entry, table = struct.unpack_from('<QQ', header, 24)
+        ehsize, entsize, count = struct.unpack_from('<HHH', header, 52)
+        if kind not in (2, 3) or machine != 62 or version != 1 or ehsize != 64 or entsize != 56 or not 1 <= count <= 256:
+            raise ValueError('unsupported ELF executable')
+        headers = read(table, count * 56)
+        executable = False
+        dynamic = False
+        for index in range(count):
+            tag, flags, offset, address, _, size, memory, align = struct.unpack_from('<IIQQQQQQ', headers, index * 56)
+            if offset + size > before.st_size or size > memory:
+                raise ValueError('ELF segment range')
+            if tag == 3:
+                raise ValueError('runtime helper has PT_INTERP')
+            if tag == 1 and flags & 1 and address <= entry < address + size:
+                executable = True
+            if tag == 2:
+                if dynamic or size > 65536 or size % 16:
+                    raise ValueError('dynamic section bounds')
+                dynamic = True
+                data = read(offset, size)
+                terminated = False
+                for position in range(0, size, 16):
+                    key, value = struct.unpack_from('<QQ', data, position)
+                    if key == 0:
+                        terminated = True
+                        break
+                    if key in (1, 14, 15, 29, 0x6ffffefa, 0x6ffffefb, 0x6ffffefc, 0x7ffffffd, 0x7fffffff):
+                        raise ValueError('external runtime dependency or loader directive')
+                if not terminated:
+                    raise ValueError('unterminated dynamic section')
+        if not executable:
+            raise ValueError('entry outside executable file-backed load')
+        after = os.fstat(source.fileno())
+        keys = lambda m: (m.st_dev, m.st_ino, m.st_size, m.st_mode, m.st_mtime_ns, m.st_ctime_ns)
+        if keys(before) != keys(after):
+            raise ValueError('runtime helper changed')
+
+for path in sys.argv[1:]:
+    validate(path)
+if len(sys.argv) != 3:
+    raise ValueError('exact shell and pager inputs required')
+""")
+}

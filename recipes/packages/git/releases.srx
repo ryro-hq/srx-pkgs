@@ -1,0 +1,11 @@
+// Exact source pins for the experimental managed factory.
+pub fn source(const version: PackagePinText) -> support::Source {
+    match version {
+        "2.55.0" => support::Source {
+            version = "2.55.0";
+            url = "https://www.kernel.org/pub/software/scm/git/git-2.55.0.tar.xz";
+            sha256 = "457fdb04dc8728e007d4688695e6912e6f680727920f2a40bf11eacc17505357";
+            maximum_bytes = 16777216;
+        }
+    }
+}

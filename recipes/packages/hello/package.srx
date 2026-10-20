@@ -1,0 +1,23 @@
+pub struct Selection {
+    version: PackagePinText = "2.12.1";
+    variant: PackagePinText = "default";
+    system: PackagePinText = "";
+    libc: PackagePinText = "";
+}
+pub fn hello_version(const selection: Selection) -> _ {
+    let target = lib::platform::direct({
+            system = selection.system;
+            libc = selection.libc;
+        });
+    let system = lib::platform::tag(target);
+    let source = releases::source(selection.version);
+    let compatibility = releases::compatibility(selection.version, selection.variant, system);
+    match compatibility.id {
+        "default" => match target.system {
+            "linux-x86_64" => match target.libc {
+                "gnu" => variants::gnu(source, compatibility),
+                "musl" => variants::musl(source, compatibility),
+            }
+        }
+    }
+}

@@ -1,0 +1,34 @@
+// One configure / make / install template for host GNU, static musl and managed builds.
+pub struct Options {
+    directory: SourceDirectory;
+    timeout_seconds: BuildTimeout = 180;
+    profile: BuildProfile = BuildProfile::HostBootstrap;
+    shell: BuildPath = BuildPath::Host("/bin/sh");
+    make: BuildPath = BuildPath::Host("/usr/bin/make");
+    configure: [BuildText];
+    environment: [BuildEnv] = [];
+    configure_environment: Option<[BuildEnv]> = Option::None;
+    before: [BuildStep] = [];
+    make_arguments: [BuildText] = [build_text("-j2")];
+    install_arguments: [BuildText] = [build_text("install"), build_text("DESTDIR=/out")];
+}
+pub fn build(options: Options) -> Build {
+    let cwd = BuildPath::Work("source/${options.directory}");
+    let configure_environment = match options.configure_environment {
+        None => options.environment,
+        Some(environment) => environment,
+    };
+    let configure = process::run(options.shell, cwd, options.configure, configure_environment);
+    let compile = process::run(options.make, cwd, options.make_arguments, options.environment);
+    let install = process::run(options.make, cwd, options.install_arguments, options.environment);
+    Build {
+        profile = options.profile;
+        source_directory = options.directory;
+        timeout_seconds = options.timeout_seconds;
+        steps = [BuildStep::Extract(BuildPath::Work("source"))] ++ options.before ++ [
+            configure,
+            compile,
+            install
+        ];
+    }
+}

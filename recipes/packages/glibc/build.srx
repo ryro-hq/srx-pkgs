@@ -1,0 +1,53 @@
+pub fn bootstrap(source: support::Source) -> Recipe {
+    templates::recipe::from_source({
+            id = "glibc";
+            source = source;
+            build = build({
+                    source_directory = "glibc-${source.version}";
+                    timeout_seconds = 1800;
+                });
+        })
+}
+fn build(options: BuildOptions) -> Build {
+    let cwd = BuildPath::Work("build");
+    Build {
+        profile = BuildProfile::HostBootstrap;
+        source_directory = options.source_directory;
+        timeout_seconds = options.timeout_seconds;
+        resources = BuildResources::Large;
+        source_format = BuildSourceFormat::Xz;
+        produces = ["dev", "out"];
+        steps = [
+            BuildStep::Extract(BuildPath::Work("source")),
+            BuildStep::Directory(cwd),
+            templates::process::run(
+                BuildPath::Host("/bin/sh"),
+                cwd,
+                [
+                    build_path(BuildPath::Work("source/${options.source_directory}/configure")),
+                    build_join([
+                            BuildPart::Literal("--prefix="),
+                            BuildPart::Path(BuildPath::Installed("out", "usr"))
+                        ]),
+                    build_text("--disable-werror")
+                ],
+                [
+                    templates::process::env("AWK", build_path(BuildPath::Host("/usr/bin/gawk"))),
+                    templates::process::env("CFLAGS", build_text("-O2 -g0"))
+                ]
+            ),
+            templates::process::run(
+                BuildPath::Host("/usr/bin/make"),
+                cwd,
+                [build_text("-j2")],
+                [templates::process::env("AWK", build_path(BuildPath::Host("/usr/bin/gawk")))]
+            ),
+            templates::process::run(
+                BuildPath::Host("/usr/bin/make"),
+                cwd,
+                [build_text("install"), build_text("DESTDIR=/out")],
+                [templates::process::env("AWK", build_path(BuildPath::Host("/usr/bin/gawk")))]
+            )
+        ] ++ steps::finish(cwd, BuildPath::Host("/bin/sh"), []);
+    }
+}

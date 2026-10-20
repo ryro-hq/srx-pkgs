@@ -1,0 +1,60 @@
+pub fn acquisition(source: support::Source) -> Acquisition {
+    Acquisition {
+        sources = [source_request(source.url, source.sha256, source.maximum_bytes)];
+    }
+}
+pub fn named_recipe(recipe: Recipe, id: PackageId) -> Recipe {
+    Recipe {
+        package = Package {
+            id = id;
+            dependencies = recipe.package.dependencies;
+        };
+        acquisition = recipe.acquisition;
+        build = recipe.build;
+        build_inputs = recipe.build_inputs;
+        commands = recipe.commands;
+        imported = recipe.imported;
+    }
+}
+// Package authors provide the differences; construction stays in one template.
+pub struct SourceRecipe {
+    id: PackageId;
+    source: support::Source;
+    build: Build;
+    build_inputs: Option<BuildInputs> = Option::None;
+    commands: [Command] = [];
+}
+pub fn from_source(specification: SourceRecipe) -> Recipe {
+    Recipe {
+        package = Package {
+            id = specification.id;
+            dependencies = [];
+        };
+        acquisition = Option::Some(acquisition(specification.source));
+        build = Option::Some(specification.build);
+        build_inputs = specification.build_inputs;
+        commands = specification.commands;
+    }
+}
+pub fn gnu_command(
+    name: CommandName,
+    path: InstalledEntry,
+    libc: RecipeRef<Recipe>,
+    libraries: [OutputRef<Recipe>]
+) -> Command {
+    Command {
+        name = name;
+        path = path;
+        output = "out";
+        loader = [RuntimeFile {
+                output = recipe_output(libc, "out");
+                path = "usr/lib/ld-linux-x86-64.so.2";
+            }];
+        libraries = [recipe_output(libc, "out")] ++ libraries;
+    }
+}
+pub fn selected_inputs(selected: [OutputRef<Recipe>]) -> Option<BuildInputs> {
+    Option::Some(BuildInputs {
+            selected = selected;
+        })
+}

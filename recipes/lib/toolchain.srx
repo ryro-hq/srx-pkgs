@@ -1,0 +1,71 @@
+// A versioned layout and ABI contract; references confer no admission.
+pub value ToolchainContract(str) where in ["gcc16-linux-x86_64-gnu-v1"];
+// Each output retains the inventory's usr/... layout and must fit its own Artifact.
+pub struct Toolchain {
+    contract: ToolchainContract = "gcc16-linux-x86_64-gnu-v1";
+    compiler: OutputRef<Recipe>;
+    python: OutputRef<Recipe>;
+    runtime: OutputRef<Recipe>;
+    sysroot: OutputRef<Recipe>;
+    tools: OutputRef<Recipe>;
+}
+// Keep the ABI's input positions and compiler layout in one module.
+pub fn compiler(path: BuildRelativePath) -> BuildPath {
+    BuildPath::Input(0, path)
+}
+pub fn python(path: BuildRelativePath) -> BuildPath {
+    BuildPath::Input(1, path)
+}
+pub fn runtime(path: BuildRelativePath) -> BuildPath {
+    BuildPath::Input(2, path)
+}
+pub fn sysroot(path: BuildRelativePath) -> BuildPath {
+    BuildPath::Input(3, path)
+}
+pub fn tools(path: BuildRelativePath) -> BuildPath {
+    BuildPath::Input(4, path)
+}
+let gcc_root: BuildRelativePath = "usr/lib/gcc/x86_64-pc-linux-gnu/16";
+pub fn gcc_include() -> BuildPath {
+    compiler("${gcc_root}/include")
+}
+// Stable BuildPath::Input slots shared by all managed catalogue factories.
+pub fn select_inputs(seed: Toolchain) -> [OutputRef<Recipe>] {
+    [seed.compiler, seed.python, seed.runtime, seed.sysroot, seed.tools]
+}
+pub fn search_path() -> BuildText {
+    build_join([
+            BuildPart::Path(compiler("usr/bin")),
+            BuildPart::Literal(":"),
+            BuildPart::Path(tools("usr/bin")),
+            BuildPart::Literal(":"),
+            BuildPart::Path(python("usr/bin")),
+        ])
+}
+pub fn compiler_environment() -> [BuildEnv] {
+    [
+        templates::process::env(
+            "GCC_EXEC_PREFIX",
+            build_join([BuildPart::Path(compiler(gcc_root)), BuildPart::Literal("/")])
+        ),
+        templates::process::env(
+            "COMPILER_PATH",
+            build_join([
+                    BuildPart::Path(compiler(gcc_root)),
+                    BuildPart::Literal(":"),
+                    BuildPart::Path(tools("usr/bin"))
+                ])
+        ),
+    ]
+}
+// Perl data paths are declared inputs; compiled defaults are not a relocation proof.
+pub fn perl_environment() -> [BuildEnv] {
+    [templates::process::env(
+            "PERL5LIB",
+            build_join([
+                    BuildPart::Path(tools("usr/lib/perl5/5.42/core_perl")),
+                    BuildPart::Literal(":"),
+                    BuildPart::Path(tools("usr/share/perl5/core_perl"))
+                ])
+        )]
+}

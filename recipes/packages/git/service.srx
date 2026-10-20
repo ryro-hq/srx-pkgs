@@ -1,0 +1,19 @@
+// The author supplies a managed recipe declaring the git command.
+pub fn git_service(tool: RecipeRef<Recipe>, configuration: ConfigText) -> Service {
+    Service {
+        id = "git";
+        files = [ConfigFile {
+                path = "gitconfig";
+                text = configuration;
+            }];
+        commands = [ServiceCommand {
+                name = "git";
+                command = recipe_command(tool, "git");
+                environment = [CommandEnvironment {
+                        name = "GIT_CONFIG_GLOBAL";
+                        argument = CommandArgument::File("gitconfig");
+                    }];
+                expose = Option::Some("git");
+            }];
+    }
+}

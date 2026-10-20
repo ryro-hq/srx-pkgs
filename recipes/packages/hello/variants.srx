@@ -1,0 +1,20 @@
+fn reference(
+    source: support::Source,
+    compatibility: support::Compatibility,
+    system: PackagePinText,
+    build: fn(support::Source) -> Recipe
+) -> PackageRef<contracts::default::Settings> {
+    templates::configured::reference<contracts::default::Settings>({
+            source = source;
+            compatibility = compatibility;
+            system = system;
+            build = build;
+            render = contracts::default::render;
+        })
+}
+pub fn gnu(source: support::Source, compatibility: support::Compatibility) -> PackageRef<contracts::default::Settings> {
+    reference(source, compatibility, "linux-x86_64-gnu", build::gnu)
+}
+pub fn musl(source: support::Source, compatibility: support::Compatibility) -> PackageRef<contracts::default::Settings> {
+    reference(source, compatibility, "linux-x86_64-musl", build::musl)
+}

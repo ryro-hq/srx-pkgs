@@ -1,0 +1,31 @@
+// Generated from catalog.toml. Selection, construction and services belong to package modules.
+pub fn source(const version: PackagePinText) -> support::Source {
+    match version {
+        "2.12.1" => support::Source {
+            version = "2.12.1";
+            url = "https://ftp.gnu.org/gnu/hello/hello-2.12.1.tar.gz";
+            sha256 = "8d99142afd92576f30b0cd7cb42a8dc6809998bc5d607d88761f512e26c7db20";
+            maximum_bytes = 2097152;
+        },
+    }
+}
+pub fn compatibility(
+    const version: PackagePinText,
+    const variant: PackagePinText,
+    const system: PackagePinText
+) -> support::Compatibility {
+    match version {
+        "2.12.1" => match variant {
+            "default" => match system {
+                "linux-x86_64-gnu" => support::Compatibility {
+                    id = "default";
+                    pin = "bb23e541e57cdd24facdf6a34c230fdf9271f8719f1fadc5890bb4e99e2e0707";
+                },
+                "linux-x86_64-musl" => support::Compatibility {
+                    id = "default";
+                    pin = "bb23e541e57cdd24facdf6a34c230fdf9271f8719f1fadc5890bb4e99e2e0707";
+                },
+            },
+        },
+    }
+}

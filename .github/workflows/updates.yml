@@ -1,0 +1,63 @@
+name: Stable updates
+on:
+  schedule:
+    - cron: '17 7 * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+concurrency:
+  group: stable-catalog-updates
+  cancel-in-progress: false
+jobs:
+  updates:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/core
+      - name: Prepare isolated native maintenance tools
+        run: docker build -f .github/maintenance.Containerfile -t syrox-maintenance:ci .github
+      - name: Discover stable releases through fixed official origins
+        run: |
+          docker run --rm --user "$(id -u):$(id -g)" --dns-option single-request \
+            --mount "type=bind,src=$PWD,dst=/catalog,readonly" \
+            syrox-maintenance:ci /catalog/.core/target/catalog-candidate/srx catalog updates /catalog > /tmp/syrox-updates.json
+      - name: Add signed versions and request checks against each exact PR SHA
+        env:
+          GH_TOKEN: ${{ secrets.SYROX_UPDATES_TOKEN }}
+        run: |
+          test -n "$GH_TOKEN"
+          gh auth setup-git
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          while IFS=$'\t' read -r name version; do
+            [[ "$name" =~ ^[a-zA-Z0-9_-]+$ ]]
+            [[ "$version" =~ ^[0-9]+(\.[0-9]+)+$ ]]
+            branch="updates/$name-$version"
+            if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+              continue
+            fi
+            git switch --detach origin/main
+            git switch -c "$branch"
+            docker run --rm --user "$(id -u):$(id -g)" --dns-option single-request \
+              --mount "type=bind,src=$PWD,dst=/catalog" \
+              syrox-maintenance:ci /catalog/.core/target/catalog-candidate/srx catalog add /catalog "$name" "$version"
+            srx catalog generate . --check
+            srx catalog check .
+            srx catalog lock . --check
+            srx catalog matrix . > /tmp/syrox-new-matrix.json
+            git add catalog.toml Catalog.lock Syrox.lock recipes changes
+            git commit -m "catalog: add $name $version without default promotion"
+            sha=$(git rev-parse HEAD)
+            git push origin "HEAD:refs/heads/$branch"
+            {
+              printf 'Adds %s %s from the fixed official channel. The pinned signing key authenticated the archive.\n\n' "$name" "$version"
+              printf 'The native change record includes source pins, contracts, toolchain inputs and every GNU/musl identity. Defaults remain unchanged.\n\n'
+              printf 'Required Catalog checks are dispatched against `%s`; publication requires real native execution and offline import for every matrix row.\n' "$sha"
+            } > /tmp/syrox-update-pr.txt
+            gh pr create --base main --head "$branch" --title "catalog: add $name $version" --body-file /tmp/syrox-update-pr.txt
+            gh workflow run catalog.yml --ref "$branch" -f "expected_sha=$sha"
+          done < <(jq -r '.[] | @tsv' /tmp/syrox-updates.json)

@@ -1,0 +1,73 @@
+pub fn managed(seed: lib::toolchain::Toolchain, libc: RecipeRef<Recipe>, source: support::Source) -> Recipe {
+    templates::recipe::from_source({
+            id = "zlib";
+            source = source;
+            build = program(source.version);
+            build_inputs = templates::recipe::selected_inputs(lib::toolchain::select_inputs(seed) ++ [
+                    recipe_output(libc, "dev"),
+                    recipe_output(libc, "out")
+                ]);
+        })
+}
+fn program(version: PackagePinText) -> Build {
+    let cwd = BuildPath::Work("source/zlib-${version}");
+    Build {
+        profile = BuildProfile::Managed;
+        source_directory = "zlib-${version}";
+        timeout_seconds = 600;
+        produces = ["dev", "out"];
+        steps = [
+            BuildStep::Extract(BuildPath::Work("source")),
+            templates::process::run(
+                lib::toolchain::tools("usr/bin/sh"),
+                cwd,
+                [
+                    build_text("configure"),
+                    build_text("--shared"),
+                    build_join([
+                            BuildPart::Literal("--prefix="),
+                            BuildPart::Path(BuildPath::Installed("dev", "usr"))
+                        ])
+                ],
+                lib::managed::library_environment()
+            ),
+            templates::process::run(
+                lib::toolchain::tools("usr/bin/make"),
+                cwd,
+                [
+                    build_text("-j2"),
+                    build_text("libz.so.${version}"),
+                    build_join([
+                            BuildPart::Literal("SHELL="),
+                            BuildPart::Path(lib::toolchain::tools("usr/bin/sh"))
+                        ])
+                ],
+                lib::managed::library_environment()
+            ),
+            BuildStep::Directory(BuildPath::Output("dev", "usr/include")),
+            BuildStep::Directory(BuildPath::Output("dev", "usr/lib")),
+            BuildStep::Directory(BuildPath::Output("out", "usr/lib")),
+            BuildStep::Copy(
+                BuildPath::Work("source/zlib-${version}/zlib.h"),
+                BuildPath::Output("dev", "usr/include/zlib.h")
+            ),
+            BuildStep::Copy(
+                BuildPath::Work("source/zlib-${version}/zconf.h"),
+                BuildPath::Output("dev", "usr/include/zconf.h")
+            ),
+            // Regular copies preserve the current artifact contract: no symlink escape or cross-output linker script.
+            BuildStep::Copy(
+                BuildPath::Work("source/zlib-${version}/libz.so.${version}"),
+                BuildPath::Output("dev", "usr/lib/libz.so")
+            ),
+            BuildStep::Copy(
+                BuildPath::Work("source/zlib-${version}/libz.so.${version}"),
+                BuildPath::Output("out", "usr/lib/libz.so.1")
+            ),
+            BuildStep::Copy(
+                BuildPath::Work("source/zlib-${version}/libz.so.${version}"),
+                BuildPath::Output("out", "usr/lib/libz.so.${version}")
+            ),
+        ];
+    }
+}

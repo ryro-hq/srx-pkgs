@@ -1,0 +1,99 @@
+// Platform spelling is normalized here; persisted identities keep full target tags.
+pub struct PlatformSelection {
+    system: PackagePinText;
+    libc: PackagePinText = "";
+}
+pub struct Platform {
+    system: PackagePinText;
+    libc: PackagePinText;
+}
+fn normalize_libc(const libc: PackagePinText) -> PackagePinText {
+    match libc {
+        "" => "gnu",
+        "gnu" => "gnu",
+        "musl" => "musl"
+    }
+}
+fn require_gnu(const libc: PackagePinText) -> PackagePinText {
+    match libc {
+        "" => "gnu",
+        "gnu" => "gnu"
+    }
+}
+fn require_musl(const libc: PackagePinText) -> PackagePinText {
+    match libc {
+        "" => "musl",
+        "musl" => "musl"
+    }
+}
+fn require_explicit_architecture(const system: PackagePinText) -> PackagePinText {
+    match system {
+        "linux-x86_64" => system,
+        "linux-aarch64" => system
+    }
+}
+pub fn normalize(const selection: PlatformSelection) -> Platform {
+    match selection.system {
+        "linux-x86_64" => Platform {
+            system = selection.system;
+            libc = normalize_libc(selection.libc);
+        },
+        "linux-aarch64" => Platform {
+            system = selection.system;
+            libc = normalize_libc(selection.libc);
+        },
+        "linux-x86_64-gnu" => Platform {
+            system = "linux-x86_64";
+            libc = require_gnu(selection.libc);
+        },
+        "linux-x86_64-musl" => Platform {
+            system = "linux-x86_64";
+            libc = require_musl(selection.libc);
+        },
+        "linux-aarch64-gnu" => Platform {
+            system = "linux-aarch64";
+            libc = require_gnu(selection.libc);
+        },
+        "linux-aarch64-musl" => Platform {
+            system = "linux-aarch64";
+            libc = require_musl(selection.libc);
+        },
+        "linux" => Platform {
+            system = require_explicit_architecture(selection.system);
+            libc = normalize_libc(selection.libc);
+        },
+        "linux-arm" => Platform {
+            system = require_explicit_architecture(selection.system);
+            libc = normalize_libc(selection.libc);
+        },
+    }
+}
+pub fn tag(const target: Platform) -> PackagePinText {
+    match target.system {
+        "linux-x86_64" => match target.libc {
+            "gnu" => "linux-x86_64-gnu",
+            "musl" => "linux-x86_64-musl"
+        },
+        "linux-aarch64" => match target.libc {
+            "gnu" => "linux-aarch64-gnu",
+            "musl" => "linux-aarch64-musl"
+        },
+    }
+}
+pub fn direct(const selection: PlatformSelection) -> Platform {
+    normalize({
+            system = if selection.system == "" {
+                "linux-x86_64"
+            }
+            else {
+                selection.system
+            };
+            libc = selection.libc;
+        })
+}
+// Bootstrap and managed GNU factories currently implement this target only.
+pub fn gnu_x86_64(const selection: PlatformSelection) -> PackagePinText {
+    match tag(direct(selection)) {
+        "linux-x86_64-gnu" => "linux-x86_64-gnu"
+    }
+}

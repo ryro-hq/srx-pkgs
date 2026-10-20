@@ -1,0 +1,59 @@
+// Configuration stays private to this service; nginx runs in the foreground.
+pub fn nginx_service(tool: RecipeRef<Recipe>, configuration: ConfigText) -> Service {
+    Service {
+        id = "nginx";
+        files = [ConfigFile {
+                path = "nginx.conf";
+                text = configuration;
+            }];
+        commands = [ServiceCommand {
+                name = "nginx";
+                command = recipe_command(tool, "nginx");
+                arguments = [
+                    CommandArgument::Literal("-c"),
+                    CommandArgument::File("nginx.conf"),
+                    CommandArgument::Literal("-g"),
+                    CommandArgument::Literal("daemon off;")
+                ];
+            }];
+        processes = [ServiceProcess {
+                id = "server";
+                command = "nginx";
+            }];
+    }
+}
+// The package's nominal configuration type is inferred before rendering.
+// The prepared closure executes its native validator before generation freeze.
+pub fn nginx_validated(tool: RecipeRef<Recipe>, configuration: ConfigText) -> Service {
+    Service {
+        id = "nginx";
+        files = [ConfigFile {
+                path = "nginx.conf";
+                text = configuration;
+            }];
+        commands = [
+            ServiceCommand {
+                name = "check-config";
+                command = recipe_command(tool, "nginx");
+                arguments = [
+                    CommandArgument::Literal("-t"),
+                    CommandArgument::Literal("-c"),
+                    CommandArgument::File("nginx.conf")
+                ];
+            },
+            ServiceCommand {
+                name = "nginx";
+                command = recipe_command(tool, "nginx");
+                arguments = [CommandArgument::Literal("-c"), CommandArgument::File("nginx.conf")];
+            },
+        ];
+        validators = ["check-config"];
+        processes = [ServiceProcess {
+                id = "server";
+                command = "nginx";
+            }];
+    }
+}
+pub fn nginx_settings<C>(package: PackageRef<C>, settings: C) -> Service {
+    nginx_validated(package_recipe(package), package_config(package, settings))
+}

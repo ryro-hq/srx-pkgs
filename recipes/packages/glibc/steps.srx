@@ -1,0 +1,44 @@
+// Both bootstrap profiles install identical locale data and dev/runtime partitions.
+let partition_program: BuildLiteral = """test -f "$OUT/usr/lib/locale/C.utf8/LC_CTYPE"
+mkdir -p "$DEV/usr/lib"
+mv "$OUT/usr/include" "$DEV/usr/include"
+mv "$OUT/usr/share" "$DEV/usr/share"
+for path in "$OUT/usr/lib/"*; do
+name=$(basename "$path")
+case "$name" in ld.so) ;; *.a|*.o|*.so) if test -L "$path"; then cp -L -- "$path" "$DEV/usr/lib/$name"; rm -- "$path"; else mv -- "$path" "$DEV/usr/lib/$name"; fi;; esac
+done
+sed -i "s|$PREFIX_OUT/usr/lib/libc_nonshared.a|$PREFIX_DEV/usr/lib/libc_nonshared.a|g" "$DEV/usr/lib/libc.so"
+""";
+pub fn finish(cwd: BuildPath, shell: BuildPath, environment: [BuildEnv]) -> [BuildStep] {
+    let locale = templates::process::run(
+        BuildPath::Output("out", "usr/lib/ld-linux-x86-64.so.2"),
+        cwd,
+        [
+            build_text("--library-path"),
+            build_path(BuildPath::Output("out", "usr/lib")),
+            build_path(BuildPath::Output("out", "usr/bin/localedef")),
+            build_text("--no-archive"),
+            build_text("-i"),
+            build_text("C"),
+            build_text("-f"),
+            build_text("UTF-8"),
+            build_path(BuildPath::Output("out", "usr/lib/locale/C.utf8"))
+        ],
+        environment ++ [templates::process::env(
+                "I18NPATH",
+                build_path(BuildPath::Output("out", "usr/share/i18n"))
+            )]
+    );
+    let partition = templates::process::run(
+        shell,
+        cwd,
+        [build_text("-eu"), build_text("-c"), build_text(partition_program)],
+        environment ++ [
+            templates::process::env("DEV", build_path(BuildPath::Output("dev", ""))),
+            templates::process::env("OUT", build_path(BuildPath::Output("out", ""))),
+            templates::process::env("PREFIX_DEV", build_path(BuildPath::Installed("dev", ""))),
+            templates::process::env("PREFIX_OUT", build_path(BuildPath::Installed("out", ""))),
+        ]
+    );
+    [BuildStep::Directory(BuildPath::Output("out", "usr/lib/locale")), locale, partition]
+}

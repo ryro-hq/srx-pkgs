@@ -1,0 +1,11 @@
+// Exact bootstrap sources; independent from the qualified application release matrix.
+pub fn source(const version: PackagePinText) -> support::Source {
+    match version {
+        "2.44" => support::Source {
+            version = "2.44";
+            url = "https://ftp.gnu.org/gnu/glibc/glibc-2.44.tar.xz";
+            sha256 = "37f600f2bef3c5e8300147059568b2a2e40a7ad6ccc65ce942556d49429cc667";
+            maximum_bytes = 33554432;
+        }
+    }
+}

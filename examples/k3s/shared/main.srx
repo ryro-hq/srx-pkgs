@@ -1,0 +1,6 @@
+pub value ClusterName(str);
+pub struct Cluster {
+    name: ClusterName = "lab";
+    endpoint: std::ConfigText = "https://10.10.0.10:6443";
+    tokenFile: std::ConfigText = "/etc/rancher/k3s/token";
+}

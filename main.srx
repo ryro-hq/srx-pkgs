@@ -1,18 +1,83 @@
-// Catalog smoke project: an authenticated local input exports pure factories.
-inputs { catalog = "path:recipes"; }
-
-outputs {
-    hello: std::Package = catalog::hello();
-    hello_sources: std::Acquisition = catalog::hello_sources();
-    hello_build: std::AutotoolsBuild = catalog::hello_build();
-    hello_build_inputs: std::BuildInputs = catalog::hello_build_inputs();
-    bootstrap: std::Package = catalog::bootstrap();
-    bootstrap_sources: std::Acquisition = catalog::bootstrap_sources();
-    bootstrap_build: std::AutotoolsBuild = catalog::bootstrap_build();
-    glibc: std::Package = catalog::glibc();
-    glibc_sources: std::Acquisition = catalog::glibc_sources();
-    glibc_build: std::GlibcBuild = catalog::glibc_build();
-    hello_application: std::Application = catalog::hello_application();
-    default_application: std::DefaultApplication = std::DefaultApplication { package = "hello"; };
-    default_build: std::DefaultBuild = std::DefaultBuild { package = "hello"; };
+inputs {
+    catalog = "modules:recipes";
 }
+pub use catalog::lib::toolchain::{
+    Toolchain,
+    ToolchainContract
+};
+pub use catalog::packages::hello::managed::managed_hello;
+pub use catalog::packages::glibc::managed::managed_glibc;
+pub use catalog::packages::glibc::{
+    glibc_version,
+    managed_glibc_version
+};
+pub use catalog::packages::git::{
+    git_version,
+    managed_git
+};
+pub use catalog::packages::zlib::{
+    zlib_version,
+    managed_zlib
+};
+pub use catalog::packages::git::service::git_service;
+pub use catalog::packages::nginx::integration::{
+    nginx_service,
+    nginx_settings,
+    nginx_validated
+};
+pub use catalog::packages::nginx::nginx;
+pub use catalog::packages::hello::hello_version;
+pub use catalog::lib::set::{
+    forSystem,
+    forPlatform,
+    PackageSet
+};
+pub use catalog::lib::platform::{
+    PlatformSelection,
+    Platform
+};
+// Explicit names keep the public API independent of the implementation tree.
+pub let bootstrap = recipe_ref(catalog::packages::bootstrap::recipe);
+pub let glibc = recipe_ref(catalog::packages::glibc::recipe);
+pub let hello = recipe_ref(catalog::packages::hello::legacy::recipe);
+pub let versioned_hello_2_12_1_gnu = package_recipe(hello_version({
+            version = "2.12.1";
+            system = "linux-x86_64-gnu";
+        }));
+pub let versioned_hello_2_12_1_musl = package_recipe(hello_version({
+            version = "2.12.1";
+            system = "linux-x86_64-musl";
+        }));
+pub let versioned_nginx_1_30_5_gnu = package_recipe(nginx({
+            version = "1.30.5";
+            system = "linux-x86_64-gnu";
+        }));
+pub let versioned_nginx_1_30_5_musl = package_recipe(nginx({
+            version = "1.30.5";
+            system = "linux-x86_64-musl";
+        }));
+pub let versioned_nginx_1_30_6_gnu = package_recipe(nginx({
+            version = "1.30.6";
+            system = "linux-x86_64-gnu";
+        }));
+pub let versioned_nginx_1_30_6_musl = package_recipe(nginx({
+            version = "1.30.6";
+            system = "linux-x86_64-musl";
+        }));
+pub type NginxSelection = catalog::packages::nginx::Selection;
+pub type HelloSelection = catalog::packages::hello::Selection;
+pub type GlibcSelection = catalog::packages::glibc::Selection;
+pub type GitSelection = catalog::packages::git::Selection;
+pub type ZlibSelection = catalog::packages::zlib::Selection;
+// K3s configuration and package preparation; privileged activation is separate.
+pub use catalog::packages::k3s::k3s;
+pub use catalog::packages::k3s::contracts::default::{
+    Settings,
+    NodeName,
+    NodeIp,
+    ServerUrl,
+    TokenFile
+};
+pub use catalog::packages::k3s::integration::k3s_service;
+pub type K3sSelection = catalog::packages::k3s::Selection;
+pub let versioned_k3s_1_37_1_gnu = package_recipe(k3s({}));

@@ -1,0 +1,21 @@
+// K3s v1.37.1+k3s1: shared YAML options for servers and agents.
+pub value NodeName(str);
+pub value NodeIp(str);
+pub value ServerUrl(str);
+pub value TokenFile(str);
+pub value Label(str);
+pub value DataDirectory(str);
+pub struct Settings {
+    #[key("node-name")] nodeName: NodeName;
+    #[key("node-ip")] nodeIp: NodeIp;
+    server: std::Option<ServerUrl> = std::Option::None;
+    #[key("token-file")] tokenFile: std::Option<TokenFile> = std::Option::None;
+    #[key("cluster-init")] clusterInit: std::Option<std::Bool> = std::Option::None;
+    #[key("data-dir")] dataDir: DataDirectory = "/var/lib/rancher/k3s";
+    #[key("node-label")] nodeLabel: [Label] = [];
+    #[key("tls-san")] tlsSan: std::Option<[ServerUrl]> = std::Option::None;
+    disable: std::Option<[Label]> = std::Option::None;
+}
+pub fn render(settings: Settings) -> std::ConfigText {
+    std::yaml::encode(settings)
+}

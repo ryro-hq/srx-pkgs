@@ -1,0 +1,74 @@
+// Dependency slots extend the five providers in toolchain's versioned contract.
+pub fn libc_dev(path: BuildRelativePath) -> BuildPath {
+    BuildPath::Input(5, path)
+}
+pub fn libc_out(path: BuildRelativePath) -> BuildPath {
+    BuildPath::Input(6, path)
+}
+pub fn zlib_dev(path: BuildRelativePath) -> BuildPath {
+    BuildPath::Input(7, path)
+}
+pub fn zlib_out(path: BuildRelativePath) -> BuildPath {
+    BuildPath::Input(8, path)
+}
+pub fn git_tools(path: BuildRelativePath) -> BuildPath {
+    BuildPath::Input(9, path)
+}
+// The compiler must resolve its own helpers/libgcc from the admitted seed.
+pub fn c_flags() -> BuildText {
+    build_join([
+            BuildPart::Literal("-O2 -nostdinc -isystem "),
+            BuildPart::Path(lib::toolchain::gcc_include()),
+            BuildPart::Literal(" -isystem "),
+            BuildPart::Path(lib::managed::libc_dev("usr/include")),
+            BuildPart::Literal(" -isystem "),
+            BuildPart::Path(lib::toolchain::sysroot("usr/include")),
+            BuildPart::Literal(" -B"),
+            BuildPart::Path(lib::managed::libc_dev("usr/lib")),
+            BuildPart::Literal("/"),
+        ])
+}
+pub fn linker_flags() -> BuildText {
+    build_join([
+            BuildPart::Literal("-L"),
+            BuildPart::Path(lib::managed::libc_out("usr/lib")),
+            BuildPart::Literal(" -Wl,--dynamic-linker="),
+            BuildPart::Path(lib::managed::libc_out("usr/lib/ld-linux-x86-64.so.2")),
+            BuildPart::Literal(" -Wl,--enable-new-dtags,-rpath,"),
+            BuildPart::Path(lib::managed::libc_out("usr/lib")),
+        ])
+}
+fn base_environment() -> [BuildEnv] {
+    lib::toolchain::compiler_environment() ++ [
+        templates::process::env("PATH", lib::toolchain::search_path()),
+        templates::process::env("SHELL", build_path(lib::toolchain::tools("usr/bin/sh"))),
+    ]
+}
+fn linker_environment() -> [BuildEnv] {
+    [
+        templates::process::env("CC", build_path(lib::toolchain::compiler("usr/bin/cc"))),
+        templates::process::env("AR", build_path(lib::toolchain::tools("usr/bin/ar"))),
+        templates::process::env("RANLIB", build_path(lib::toolchain::tools("usr/bin/ranlib"))),
+        templates::process::env("CFLAGS", c_flags()),
+        templates::process::env("LDFLAGS", linker_flags()),
+        templates::process::env("LC_ALL", build_text("C")),
+    ]
+}
+pub fn environment() -> [BuildEnv] {
+    base_environment() ++ [templates::process::env(
+            "CONFIG_SHELL",
+            build_path(lib::toolchain::tools("usr/bin/sh"))
+        )] ++ linker_environment()
+}
+pub fn library_environment() -> [BuildEnv] {
+    base_environment() ++ linker_environment()
+}
+pub fn script_environment() -> [BuildEnv] {
+    base_environment() ++ [
+        templates::process::env("LC_ALL", build_text("C")),
+        templates::process::env(
+            "SYROX_BUILD_SHELL",
+            build_path(lib::toolchain::tools("usr/bin/sh"))
+        ),
+    ]
+}
