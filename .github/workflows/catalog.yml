@@ -5,6 +5,8 @@ on:
     branches: [main]
   merge_group:
     types: [checks_requested]
+  schedule:
+    - cron: '23 4 * * 0'
   workflow_dispatch:
     inputs:
       expected_sha:
@@ -22,14 +24,61 @@ env:
   CARGO_PROFILE_TEST_DEBUG: '0'
   CARGO_BUILD_JOBS: '2'
 jobs:
+  changes:
+    runs-on: ubuntu-24.04
+    outputs:
+      heavy: ${{ steps.changes.outputs.heavy }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: changes
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = schedule ] || [ "$GITHUB_EVENT_NAME" = workflow_dispatch ] || ! [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]] || ! git cat-file -e "$BASE_SHA^{commit}"; then
+            echo 'heavy=true' >> "$GITHUB_OUTPUT"
+          else
+            cargo xtask ci classify "$BASE_SHA" "$HEAD_SHA" >> "$GITHUB_OUTPUT"
+            cargo xtask ci commits "$BASE_SHA" "$HEAD_SHA"
+          fi
+  security:
+    uses: ./.github/workflows/security.yml
+    permissions:
+      contents: read
+      security-events: write
+  workflow-policy:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Install authenticated workflow linter
+        run: |
+          cargo xtask security tools --output "$RUNNER_TEMP/srx-tools" --tool workflows
+          echo "$RUNNER_TEMP/srx-tools" >> "$GITHUB_PATH"
+      - run: cargo xtask security workflows
+  core:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/core
+        with:
+          build: 'true'
   check:
+    needs: core
     runs-on: ubuntu-24.04
     outputs:
       matrix: ${{ steps.matrix.outputs.matrix }}
       hosts: ${{ steps.matrix.outputs.hosts }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          persist-credentials: false
           fetch-depth: 0
       - name: Admit the exact dispatched SHA
         env:
@@ -40,25 +89,11 @@ jobs:
             test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
           fi
       - uses: ./.github/actions/core
-      - name: Export the engine's systemd interface contract
-        working-directory: .core
-        run: cargo run --locked -p syrox-engine --example systemd_contract > /tmp/systemd-contract.json
       - name: Verify every lock and retained identity
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
         run: |
-          python3 tests/test-package-templates.py "$(command -v srx)"
-          python3 tests/test-configured-template.py "$(command -v srx)"
-          python3 hosts/systemd/sync.py /tmp/systemd-contract.json --check
-          python3 tests/test-systemd-contract.py /tmp/systemd-contract.json
-          python3 tests/check-packages.py "$(command -v srx)"
-          python3 tests/check-platforms.py "$(command -v srx)"
-          python3 tests/check-toolchains.py "$(command -v srx)"
-          python3 tests/test-qualification-hosts.py
-          python3 examples/k3s/check.py --srx "$(command -v srx)"
-          srx catalog generate . --check
-          srx catalog check .
-          srx catalog lock . --check
+          cargo xtask check
           if [ -n "$BASE_SHA" ] && git cat-file -e "$BASE_SHA:Catalog.lock" 2>/dev/null; then
             git show "$BASE_SHA:Catalog.lock" > /tmp/previous-catalog.lock
             srx catalog preserve . /tmp/previous-catalog.lock
@@ -66,29 +101,32 @@ jobs:
       - id: matrix
         run: |
           srx catalog matrix . > /tmp/catalog-matrix.json
-          python3 .github/scripts/qualification.py matrix /tmp/catalog-matrix.json >> "$GITHUB_OUTPUT"
+          cargo xtask qualification matrix /tmp/catalog-matrix.json >> "$GITHUB_OUTPUT"
 
   environment:
     name: environment (${{ matrix.host }})
-    needs: check
+    needs: [changes, check]
+    if: needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.check.outputs.hosts) }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/core
       - name: Admit KVM for environment preparation
         run: |
           test -c /dev/kvm
           sudo chown "$(id -u):$(id -g)" /dev/kvm
           sudo chmod 660 /dev/kvm
-      - uses: actions/cache/restore@v6
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         id: vm-cache
         with:
           path: .environment
-          key: catalog-vm-${{ matrix.host }}-linux-6.12.109-${{ hashFiles('.syrox-core', '.github/qualification-hosts.json', '.github/scripts/qualification.py', '.core/tests/vm/*.Containerfile', '.core/crates/syrox/tests/vm_support/prepare.rs') }}
+          key: catalog-vm-${{ matrix.host }}-linux-6.12.109-${{ hashFiles('.syrox-core', '.github/qualification-hosts.json', 'tools/xtask/src/qualification.rs', '.core/tests/vm/*.Containerfile', '.core/crates/syrox/tests/vm_support/prepare.rs') }}
       - name: Build the isolated Linux environment
         if: steps.vm-cache.outputs.cache-hit != 'true'
         working-directory: .core
@@ -105,13 +143,16 @@ jobs:
             --build-arg BASE_IMAGE="$BASE_IMAGE" \
             -f tests/vm/guest.Containerfile -t syrox-catalog:ci tests/vm
           docker save --output ../.environment/image.tar syrox-catalog:ci
-          cargo test --locked -p syrox --test vm -- --prepare --install-runtime --build-firmware \
+          target/catalog-candidate/catalog-harness --prepare --install-runtime --build-firmware \
             --image-archive "$PWD/../.environment/image.tar" --preparation-image "$(cat ../.environment/image.id)" --profile native
           cp target/vm-runtime/bin/msb ../.environment/msb
           cp target/vm-runtime/landlock/{libkrunfw.so.5.6.1,provenance.json} ../.environment/
-          python3 ../.github/scripts/qualification.py record "$QUALIFICATION_HOST" ../.environment
+          (cd .. && cargo xtask security tools --output "$RUNNER_TEMP/srx-tools" --tool syft)
+          "$RUNNER_TEMP/srx-tools/syft" scan docker-archive:../.environment/image.tar -o spdx-json=../.environment/host.spdx.json
+          docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges --user 65534:65534             --entrypoint /usr/bin/cat "$(cat ../.environment/image.id)" /usr/share/doc/musl/copyright > ../.environment/musl-copyright
+          (cd .. && cargo xtask qualification record "$QUALIFICATION_HOST" .environment)
           cd ../.environment
-          sha256sum image.tar image.id msb libkrunfw.so.5.6.1 provenance.json "host-$QUALIFICATION_HOST.json" > SHA256SUMS
+          sha256sum image.tar image.id msb libkrunfw.so.5.6.1 provenance.json "host-$QUALIFICATION_HOST.json" host.spdx.json musl-copyright > SHA256SUMS
       - name: Release the bounded image builder
         if: always() && steps.vm-cache.outputs.cache-hit != 'true'
         run: docker buildx rm --force catalog-environment
@@ -121,21 +162,24 @@ jobs:
           sha256sum -c SHA256SUMS
           jq -e '.kernel == "6.12.109" and .sdk == "0.7.3"' provenance.json
           test "$(sha256sum libkrunfw.so.5.6.1 | cut -d' ' -f1)" = "$(jq -r .firmware_sha256 provenance.json)"
-      - uses: actions/cache/save@v6
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         if: github.ref == 'refs/heads/main' && steps.vm-cache.outputs.cache-hit != 'true'
         with:
           path: .environment
           key: ${{ steps.vm-cache.outputs.cache-primary-key }}
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: environment-${{ matrix.host }}
           path: .environment/*
           include-hidden-files: true
           if-no-files-found: error
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: host-${{ matrix.host }}
-          path: .environment/host-${{ matrix.host }}.json
+          path: |
+            .environment/host-${{ matrix.host }}.json
+            .environment/host.spdx.json
+            .environment/musl-copyright
           include-hidden-files: true
           if-no-files-found: error
 
@@ -148,9 +192,11 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJSON(needs.check.outputs.matrix) }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/core
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: environment-${{ matrix.host }}
           path: .environment
@@ -161,7 +207,7 @@ jobs:
           test -c /dev/kvm
           sudo chown "$(id -u):$(id -g)" /dev/kvm
           sudo chmod 660 /dev/kvm
-      - uses: actions/cache/restore@v6
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         id: store-cache
         with:
           path: .store
@@ -180,19 +226,19 @@ jobs:
           QUALIFICATION_HOST: ${{ matrix.host }}
           SYROX_VM_CONFIG: ${{ github.workspace }}/.environment/job.json
         run: |
-          cargo test --locked -p syrox --test vm -- --prepare \
+          target/catalog-candidate/catalog-harness --prepare \
             --image-archive "$PWD/../.environment/image.tar" \
             --runtime "$PWD/../.environment/msb" --firmware "$PWD/../.environment/libkrunfw.so.5.6.1" \
             --profile native --candidate-bundle "$PWD/target/catalog-candidate"
-          cargo test --locked -p syrox --test vm -- --qualify-catalog \
+          target/catalog-candidate/catalog-harness --qualify-catalog \
             "$PWD/.." "$IDENTITY" "$PWD/../build.toml" "$PWD/../.store" "$PWD/../.evidence"
           cp ../.evidence/qualification-vm.json "../.evidence/results/$IDENTITY.$QUALIFICATION_HOST.vm.json"
-      - uses: actions/cache/save@v6
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         if: github.ref == 'refs/heads/main' && steps.store-cache.outputs.cache-hit != 'true'
         with:
           path: .store
           key: ${{ steps.store-cache.outputs.cache-primary-key }}
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: logs-${{ matrix.host }}-${{ matrix.identity }}
@@ -201,7 +247,7 @@ jobs:
             .evidence/qualification-vm.json
           include-hidden-files: true
           if-no-files-found: error
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: qualification-${{ matrix.host }}-${{ matrix.identity }}
           path: .evidence/results/*
@@ -216,88 +262,158 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJSON(needs.check.outputs.hosts) }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/core
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           pattern: qualification-${{ matrix.host }}-*
           merge-multiple: true
           path: .release
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: host-${{ matrix.host }}
           path: .release
+      - name: Name the guest SBOM for this qualification host
+        env:
+          QUALIFICATION_HOST: ${{ matrix.host }}
+        run: |
+          mv .release/host.spdx.json ".release/host-$QUALIFICATION_HOST.spdx.json"
+          mv .release/musl-copyright ".release/musl-$QUALIFICATION_HOST.copyright"
       - name: Require every combination and bind it to this guest environment
         env:
           QUALIFICATION_HOST: ${{ matrix.host }}
         run: |
           srx catalog release-manifest . --evidence .release --output ".release/manifest-$QUALIFICATION_HOST.json"
-          python3 .github/scripts/qualification.py verify "$QUALIFICATION_HOST" .release
-      - uses: actions/upload-artifact@v7
+          cargo xtask qualification verify "$QUALIFICATION_HOST" .release
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: matrix.canonical
         with:
           name: canonical-release
           path: .release/*
           include-hidden-files: true
           if-no-files-found: error
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: host-manifest-${{ matrix.host }}
           path: |
             .release/manifest-${{ matrix.host }}.json
             .release/qualification-${{ matrix.host }}.json
             .release/host-${{ matrix.host }}.json
+            .release/host-${{ matrix.host }}.spdx.json
+            .release/musl-${{ matrix.host }}.copyright
             .release/*.${{ matrix.host }}.vm.json
           include-hidden-files: true
           if-no-files-found: error
 
-  success:
-    needs: [check, environment, qualify, manifests]
+  verify:
+    needs: [changes, core, check, environment, qualify, manifests, security, workflow-policy]
     if: always()
     runs-on: ubuntu-24.04
     steps:
       - env:
           RESULTS: ${{ toJSON(needs) }}
-        run: jq -e 'all(.[]; .result == "success")' <<< "$RESULTS"
-      - uses: actions/checkout@v7
+          HEAVY: ${{ needs.changes.outputs.heavy }}
+        run: |
+          jq -e --arg heavy "$HEAVY" 'to_entries | all(
+            if (.key == "environment" or .key == "qualify" or .key == "manifests") and $heavy == "false"
+            then .value.result == "skipped" else .value.result == "success" end)' <<< "$RESULTS"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        if: needs.changes.outputs.heavy == 'true'
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/core
-      - uses: actions/download-artifact@v8
+        if: needs.changes.outputs.heavy == 'true'
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        if: needs.changes.outputs.heavy == 'true'
         with:
           name: canonical-release
           path: .release
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        if: needs.changes.outputs.heavy == 'true'
         with:
           pattern: host-manifest-*
           merge-multiple: true
           path: .release
       - name: Reverify the canonical release and retain both userspace reports
+        if: needs.changes.outputs.heavy == 'true'
         run: srx catalog release-manifest . --evidence .release --output .release/manifest.json
-      - uses: actions/upload-artifact@v7
+      - name: Prepare license/source payload, SPDX and vulnerability evidence
+        if: needs.changes.outputs.heavy == 'true'
+        run: |
+          cargo xtask security tools --output "$RUNNER_TEMP/release-tools"
+          echo "$RUNNER_TEMP/release-tools" >> "$GITHUB_PATH"
+      - name: Block unqualified release inventories and vulnerable content
+        if: needs.changes.outputs.heavy == 'true'
+        run: cargo xtask release catalog .release
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: needs.changes.outputs.heavy == 'true'
         with:
           name: release
-          path: .release/*
+          path: .release/**
           include-hidden-files: true
           if-no-files-found: error
 
+
+  success:
+    if: always()
+    needs: verify
+    runs-on: ubuntu-24.04
+    steps:
+      - env:
+          RESULT: ${{ needs.verify.result }}
+        run: test "$RESULT" = success
+
   publish:
-    needs: success
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [changes, verify]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-24.04
     permissions:
       contents: write
+      attestations: write
+      id-token: write
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/download-artifact@v8
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: release
           path: .release
+      - name: Verify release bytes and archive the complete payload
+        run: |
+          (cd .release && sha256sum --check SHA256SUMS)
+          tar -czf catalog-payload.tar.gz -C .release .
+          sha256sum catalog-payload.tar.gz > catalog-payload.tar.gz.sha256
+      - name: Bind release bytes to the trusted publishing workflow
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: catalog-payload.tar.gz
+      - name: Bind the SPDX inventory to the same bytes
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: catalog-payload.tar.gz
+          sbom-path: .release/sbom.spdx.json
       - name: Publish an immutable catalog release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           tag="catalog-$GITHUB_SHA"
+          test "$(gh api "repos/$GITHUB_REPOSITORY/immutable-releases" --jq .enabled)" = true
+          gh attestation verify catalog-payload.tar.gz --repo "$GITHUB_REPOSITORY" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/catalog.yml" --source-digest "$GITHUB_SHA"
+          gh attestation trusted-root > trusted_root.jsonl
+          gh attestation download catalog-payload.tar.gz --repo "$GITHUB_REPOSITORY"
+          digest=$(sha256sum catalog-payload.tar.gz | cut -d' ' -f1)
+          for predicate in https://slsa.dev/provenance/v1 https://spdx.dev/Document; do
+            gh attestation verify catalog-payload.tar.gz --repo "$GITHUB_REPOSITORY" \
+              --bundle "sha256:$digest.jsonl" --custom-trusted-root trusted_root.jsonl \
+              --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/catalog.yml" \
+              --source-digest "$GITHUB_SHA" --predicate-type "$predicate" --deny-self-hosted-runners
+          done
           gh release create "$tag" --target "$GITHUB_SHA" --draft --title "$tag" \
             --notes 'Native GNU/musl qualification in pinned Debian and Ubuntu userspaces on Linux 6.12.109. Canonical Debian bundles, separate userspace manifests, pinned upstream provenance and offline runtime checks.' \
-            .release/* Catalog.lock Syrox.lock catalog.toml
+            catalog-payload.tar.gz catalog-payload.tar.gz.sha256 "sha256:$digest.jsonl" trusted_root.jsonl .release/sbom.spdx.json .release/grype.json .release/SHA256SUMS Catalog.lock Syrox.lock catalog.toml
           gh release edit "$tag" --draft=false
           test "$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" --jq .immutable)" = true

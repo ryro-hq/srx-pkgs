@@ -1,5 +1,5 @@
 pub fn bootstrap(source: support::Source) -> Recipe {
-    templates::recipe::from_source({
+    builders::recipe::from_source({
             id = "glibc";
             source = source;
             build = build({
@@ -20,7 +20,7 @@ fn build(options: BuildOptions) -> Build {
         steps = [
             BuildStep::Extract(BuildPath::Work("source")),
             BuildStep::Directory(cwd),
-            templates::process::run(
+            builders::process::run(
                 BuildPath::Host("/bin/sh"),
                 cwd,
                 [
@@ -32,21 +32,21 @@ fn build(options: BuildOptions) -> Build {
                     build_text("--disable-werror")
                 ],
                 [
-                    templates::process::env("AWK", build_path(BuildPath::Host("/usr/bin/gawk"))),
-                    templates::process::env("CFLAGS", build_text("-O2 -g0"))
+                    builders::process::env("AWK", build_path(BuildPath::Host("/usr/bin/gawk"))),
+                    builders::process::env("CFLAGS", build_text("-O2 -g0"))
                 ]
             ),
-            templates::process::run(
+            builders::process::run(
                 BuildPath::Host("/usr/bin/make"),
                 cwd,
                 [build_text("-j2")],
-                [templates::process::env("AWK", build_path(BuildPath::Host("/usr/bin/gawk")))]
+                [builders::process::env("AWK", build_path(BuildPath::Host("/usr/bin/gawk")))]
             ),
-            templates::process::run(
+            builders::process::run(
                 BuildPath::Host("/usr/bin/make"),
                 cwd,
                 [build_text("install"), build_text("DESTDIR=/out")],
-                [templates::process::env("AWK", build_path(BuildPath::Host("/usr/bin/gawk")))]
+                [builders::process::env("AWK", build_path(BuildPath::Host("/usr/bin/gawk")))]
             )
         ] ++ steps::finish(cwd, BuildPath::Host("/bin/sh"), []);
     }

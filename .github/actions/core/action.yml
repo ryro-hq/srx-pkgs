@@ -1,5 +1,9 @@
 name: Pinned Syrox
 description: Build the exact core and authenticate its static CLI and worker
+inputs:
+  build:
+    description: Build once; other jobs download the authenticated candidate from this workflow.
+    default: 'false'
 outputs:
   sha:
     description: Checked core commit
@@ -13,19 +17,21 @@ runs:
         sha=$(cat .syrox-core)
         [[ "$sha" =~ ^[0-9a-f]{40}$ ]]
         echo "sha=$sha" >> "$GITHUB_OUTPUT"
-    - uses: actions/checkout@v7
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       with:
         repository: ryro-hq/srx
         ref: ${{ steps.pin.outputs.sha }}
         path: .core
         persist-credentials: false
-    - shell: bash
+    - if: inputs.build == 'true'
+      shell: bash
       working-directory: .core
       run: |
         rustup show active-toolchain
         sudo apt-get update
         sudo apt-get install -y musl-tools liblzma-dev pkg-config gnupg
-    - uses: actions/cache@v6
+    - if: inputs.build == 'true'
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
       with:
         path: |
           ~/.cargo/registry
@@ -34,7 +40,8 @@ runs:
           .core/target/release
           .core/target/x86_64-unknown-linux-gnu
         key: core-linux-x86_64-gnu-${{ steps.pin.outputs.sha }}-${{ hashFiles('.core/Cargo.lock') }}
-    - shell: bash
+    - if: inputs.build == 'true'
+      shell: bash
       working-directory: .core
       env:
         RUSTFLAGS: -C target-feature=+crt-static
@@ -47,4 +54,21 @@ runs:
         mkdir -p target/catalog-candidate
         cp target/x86_64-unknown-linux-gnu/release/{srx,syrox-worker} target/catalog-candidate/
         RUSTFLAGS='' cargo run --locked -p syrox-engine --example ci_candidates -- "$PWD/target/catalog-candidate" x86_64-unknown-linux-gnu
-        echo "$PWD/target/catalog-candidate" >> "$GITHUB_PATH"
+        cargo test --locked -p syrox --test vm --no-run --message-format json > target/catalog-harness.jsonl
+        jq -rs '[.[] | select(.reason == "compiler-artifact" and .target.name == "vm" and .executable != null)][-1].executable' target/catalog-harness.jsonl > target/catalog-harness.path
+        cp "$(cat target/catalog-harness.path)" target/catalog-candidate/catalog-harness
+    - if: inputs.build == 'true'
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+      with:
+        name: core-${{ steps.pin.outputs.sha }}
+        path: .core/target/catalog-candidate/*
+        if-no-files-found: error
+    - if: inputs.build != 'true'
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+      with:
+        name: core-${{ steps.pin.outputs.sha }}
+        path: .core/target/catalog-candidate
+    - shell: bash
+      run: |
+        chmod 700 .core/target/catalog-candidate/{srx,syrox-worker,catalog-harness}
+        echo "$PWD/.core/target/catalog-candidate" >> "$GITHUB_PATH"

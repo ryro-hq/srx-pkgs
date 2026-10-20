@@ -1,9 +1,9 @@
 pub fn managed(seed: lib::toolchain::Toolchain, libc: RecipeRef<Recipe>, source: support::Source) -> Recipe {
-    templates::recipe::from_source({
+    builders::recipe::from_source({
             id = "zlib";
             source = source;
             build = program(source.version);
-            build_inputs = templates::recipe::selected_inputs(lib::toolchain::select_inputs(seed) ++ [
+            build_inputs = builders::recipe::selected_inputs(lib::toolchain::select_inputs(seed) ++ [
                     recipe_output(libc, "dev"),
                     recipe_output(libc, "out")
                 ]);
@@ -18,7 +18,7 @@ fn program(version: PackagePinText) -> Build {
         produces = ["dev", "out"];
         steps = [
             BuildStep::Extract(BuildPath::Work("source")),
-            templates::process::run(
+            builders::process::run(
                 lib::toolchain::tools("usr/bin/sh"),
                 cwd,
                 [
@@ -31,7 +31,7 @@ fn program(version: PackagePinText) -> Build {
                 ],
                 lib::managed::library_environment()
             ),
-            templates::process::run(
+            builders::process::run(
                 lib::toolchain::tools("usr/bin/make"),
                 cwd,
                 [

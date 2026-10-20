@@ -1,20 +1,20 @@
 pub fn gnu(source: support::Source) -> Recipe {
-    templates::recipe::from_source({
+    builders::recipe::from_source({
             id = "hello";
             source = source;
             build = lib::gnu::autotools({
                     source_directory = "hello-${source.version}";
                     timeout_seconds = 180;
                 });
-            build_inputs = templates::recipe::selected_inputs([
+            build_inputs = builders::recipe::selected_inputs([
                     recipe_output(glibc::runtime, "dev"),
                     recipe_output(glibc::runtime, "out")
                 ]);
-            commands = [templates::recipe::gnu_command("hello", "usr/bin/hello", glibc::runtime, [])];
+            commands = [builders::recipe::gnu_command("hello", "usr/bin/hello", glibc::runtime, [])];
         })
 }
 pub fn musl(source: support::Source) -> Recipe {
-    templates::recipe::from_source({
+    builders::recipe::from_source({
             id = "hello";
             source = source;
             build = musl_build("hello-${source.version}");
@@ -26,16 +26,16 @@ pub fn musl(source: support::Source) -> Recipe {
         })
 }
 fn musl_build(directory: SourceDirectory) -> Build {
-    templates::autotools::build({
+    builders::autotools::build({
             directory = directory;
             configure = [
                 build_text("./configure"),
                 build_text("--disable-nls"),
-                templates::process::argument("--prefix=", BuildPath::Installed("out", "usr"))
+                builders::process::argument("--prefix=", BuildPath::Installed("out", "usr"))
             ];
             environment = [
-                templates::process::env("CC", build_text("/usr/bin/musl-gcc")),
-                templates::process::env("LDFLAGS", build_text("-static"))
+                builders::process::env("CC", build_text("/usr/bin/musl-gcc")),
+                builders::process::env("LDFLAGS", build_text("-static"))
             ];
         })
 }

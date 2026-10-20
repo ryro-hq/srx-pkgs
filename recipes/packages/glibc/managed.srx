@@ -1,16 +1,13 @@
 // Experimental GNU factory; see docs/recipes.md for the explicit seed contract.
-pub fn managed_glibc(seed: lib::toolchain::Toolchain) -> Recipe {
-    build(seed, releases::source("2.44"))
-}
 pub fn build(seed: lib::toolchain::Toolchain, source: support::Source) -> Recipe {
-    templates::recipe::from_source({
+    builders::recipe::from_source({
             id = "glibc-managed";
             source = source;
             build = program({
                     source_directory = "glibc-${source.version}";
                     timeout_seconds = 1800;
                 });
-            build_inputs = templates::recipe::selected_inputs(lib::toolchain::select_inputs(seed));
+            build_inputs = builders::recipe::selected_inputs(lib::toolchain::select_inputs(seed));
         })
 }
 fn program(options: BuildOptions) -> Build {
@@ -25,34 +22,13 @@ fn program(options: BuildOptions) -> Build {
         steps = [
             BuildStep::Extract(BuildPath::Work("source")),
             // The pinned source calls this script directly from Makerules and posix/Makefile.
-            templates::process::run(
-                lib::toolchain::python("usr/bin/python3"),
-                BuildPath::Work(""),
-                [
-                    build_text("-I"),
-                    build_text("-c"),
-                    build_text("""import os, pathlib, stat, sys
-path = pathlib.Path(sys.argv[1])
-shell = os.fsencode(sys.argv[2])
-header = b'#!' + shell + b'\\n'
-if not shell.startswith(b'/') or any(byte <= 32 or byte == 127 for byte in shell) or len(header) > 127:
-    raise SystemExit('invalid declared shell shebang')
-before = path.read_bytes()
-original = b'#! /bin/sh\\n'
-if not before.startswith(original):
-    raise SystemExit('unexpected glibc mkinstalldirs shebang')
-mode = stat.S_IMODE(path.stat().st_mode)
-path.write_bytes(header + before[len(original):])
-if stat.S_IMODE(path.stat().st_mode) != mode:
-    raise SystemExit('mkinstalldirs mode changed')
-"""),
-                    build_path(BuildPath::Work("source/${options.source_directory}/scripts/mkinstalldirs")),
-                    build_path(lib::toolchain::tools("usr/bin/sh"))
-                ],
-                environment(target_compiler())
+            BuildStep::ReplaceShebang(
+                BuildPath::Work("source/${options.source_directory}/scripts/mkinstalldirs"),
+                "#! /bin/sh\n",
+                lib::toolchain::tools("usr/bin/sh")
             ),
             BuildStep::Directory(cwd),
-            templates::process::run(
+            builders::process::run(
                 lib::toolchain::tools("usr/bin/sh"),
                 cwd,
                 [
@@ -67,7 +43,7 @@ if stat.S_IMODE(path.stat().st_mode) != mode:
                             BuildPart::Path(lib::toolchain::sysroot("usr/include"))
                         ])
                 ],
-                environment(bootstrap_compiler()) ++ [templates::process::env(
+                environment(bootstrap_compiler()) ++ [builders::process::env(
                         "INSTALL",
                         build_join([
                                 BuildPart::Path(lib::toolchain::tools("usr/bin/sh")),
@@ -77,13 +53,13 @@ if stat.S_IMODE(path.stat().st_mode) != mode:
                             ])
                     )]
             ),
-            templates::process::run(
+            builders::process::run(
                 lib::toolchain::tools("usr/bin/make"),
                 cwd,
                 [build_text("-j2"), make_shell(), make_cc(), make_build_cc()],
                 environment(target_compiler())
             ),
-            templates::process::run(
+            builders::process::run(
                 lib::toolchain::tools("usr/bin/make"),
                 cwd,
                 [
@@ -133,25 +109,25 @@ fn bootstrap_compiler() -> BuildText {
 }
 fn environment(cc: BuildText) -> [BuildEnv] {
     lib::toolchain::compiler_environment() ++ [
-        templates::process::env("PATH", lib::toolchain::search_path()),
-        templates::process::env("SHELL", build_path(lib::toolchain::tools("usr/bin/sh"))),
-        templates::process::env("CONFIG_SHELL", build_path(lib::toolchain::tools("usr/bin/sh"))),
-        templates::process::env("CC", cc),
-        templates::process::env("BUILD_CC", bootstrap_compiler()),
-        templates::process::env("CFLAGS", build_text("-O2")),
-        templates::process::env("AWK", build_path(lib::toolchain::tools("usr/bin/gawk"))),
-        templates::process::env("BISON", build_path(lib::toolchain::tools("usr/bin/bison"))),
-        templates::process::env(
+        builders::process::env("PATH", lib::toolchain::search_path()),
+        builders::process::env("SHELL", build_path(lib::toolchain::tools("usr/bin/sh"))),
+        builders::process::env("CONFIG_SHELL", build_path(lib::toolchain::tools("usr/bin/sh"))),
+        builders::process::env("CC", cc),
+        builders::process::env("BUILD_CC", bootstrap_compiler()),
+        builders::process::env("CFLAGS", build_text("-O2")),
+        builders::process::env("AWK", build_path(lib::toolchain::tools("usr/bin/gawk"))),
+        builders::process::env("BISON", build_path(lib::toolchain::tools("usr/bin/bison"))),
+        builders::process::env(
             "BISON_PKGDATADIR",
             build_path(lib::toolchain::tools("usr/share/bison"))
         ),
-        templates::process::env("M4", build_path(lib::toolchain::tools("usr/bin/m4"))),
-        templates::process::env("PYTHON", build_path(lib::toolchain::python("usr/bin/python3"))),
-        templates::process::env("AR", build_path(lib::toolchain::tools("usr/bin/ar"))),
-        templates::process::env("AS", build_path(lib::toolchain::tools("usr/bin/as"))),
-        templates::process::env("LD", build_path(lib::toolchain::tools("usr/bin/ld"))),
-        templates::process::env("NM", build_path(lib::toolchain::tools("usr/bin/nm"))),
-        templates::process::env("RANLIB", build_path(lib::toolchain::tools("usr/bin/ranlib"))),
-        templates::process::env("LC_ALL", build_text("C")),
+        builders::process::env("M4", build_path(lib::toolchain::tools("usr/bin/m4"))),
+        builders::process::env("PYTHON", build_path(lib::toolchain::python("usr/bin/python3"))),
+        builders::process::env("AR", build_path(lib::toolchain::tools("usr/bin/ar"))),
+        builders::process::env("AS", build_path(lib::toolchain::tools("usr/bin/as"))),
+        builders::process::env("LD", build_path(lib::toolchain::tools("usr/bin/ld"))),
+        builders::process::env("NM", build_path(lib::toolchain::tools("usr/bin/nm"))),
+        builders::process::env("RANLIB", build_path(lib::toolchain::tools("usr/bin/ranlib"))),
+        builders::process::env("LC_ALL", build_text("C")),
     ]
 }

@@ -1,0 +1,18 @@
+[workspace]
+resolver = "3"
+members = ["tools/xtask"]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.98.1"
+license = "Apache-2.0"
+publish = false
+
+[profile.dev]
+debug = 0
+incremental = false
+
+[profile.test]
+debug = 0
+incremental = false

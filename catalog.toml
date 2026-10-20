@@ -36,25 +36,24 @@ source = "recipes/packages/nginx/releases.srx"
 variant = "minimal"
 system = "linux-x86_64-gnu"
 factory = "nginx"
-toolchain = "toolchains/linux-x86_64-gnu.toml"
+qualification = "qualification/nginx/checks.toml"
 recipe = "recipes/packages/nginx/package.srx"
 export = "nginx"
 contract = "recipes/packages/nginx/contracts/minimal.srx"
 contract_type = "Settings"
 recipe_inputs = [
     ".syrox-core",
-    "hosts/systemd/contract.toml",
     "recipes/support.srx",
-    "recipes/templates/recipe.srx",
-  "recipes/templates/configured.srx",
-    "recipes/templates/process.srx",
+    "recipes/builders/recipe.srx",
+  "recipes/builders/configured.srx",
+    "recipes/builders/process.srx",
     "recipes/lib/platform.srx",
     "recipes/packages/nginx/variants.srx",
     "recipes/packages/nginx/build.srx",
     "recipes/packages/nginx/steps.srx",
     "recipes/packages/nginx/integration.srx",
     "recipes/lib/gnu.srx",
-    "recipes/templates/autotools.srx",
+    "recipes/builders/autotools.srx",
     "recipes/packages/glibc/steps.srx",
     "recipes/packages/glibc/package.srx",
     "recipes/packages/glibc/releases.srx",
@@ -65,18 +64,17 @@ recipe_inputs = [
 variant = "minimal"
 system = "linux-x86_64-musl"
 factory = "nginx"
-toolchain = "toolchains/linux-x86_64-musl.toml"
+qualification = "qualification/nginx/checks.toml"
 recipe = "recipes/packages/nginx/package.srx"
 export = "nginx"
 contract = "recipes/packages/nginx/contracts/minimal.srx"
 contract_type = "Settings"
 recipe_inputs = [
     ".syrox-core",
-    "hosts/systemd/contract.toml",
     "recipes/support.srx",
-    "recipes/templates/recipe.srx",
-  "recipes/templates/configured.srx",
-    "recipes/templates/process.srx",
+    "recipes/builders/recipe.srx",
+  "recipes/builders/configured.srx",
+    "recipes/builders/process.srx",
     "recipes/lib/platform.srx",
     "recipes/packages/nginx/variants.srx",
     "recipes/packages/nginx/build.srx",
@@ -97,25 +95,24 @@ source = "recipes/packages/nginx/releases.srx"
 variant = "minimal"
 system = "linux-x86_64-gnu"
 factory = "nginx"
-toolchain = "toolchains/linux-x86_64-gnu.toml"
+qualification = "qualification/nginx/checks.toml"
 recipe = "recipes/packages/nginx/package.srx"
 export = "nginx"
 contract = "recipes/packages/nginx/contracts/minimal.srx"
 contract_type = "Settings"
 recipe_inputs = [
     ".syrox-core",
-    "hosts/systemd/contract.toml",
     "recipes/support.srx",
-    "recipes/templates/recipe.srx",
-  "recipes/templates/configured.srx",
-    "recipes/templates/process.srx",
+    "recipes/builders/recipe.srx",
+  "recipes/builders/configured.srx",
+    "recipes/builders/process.srx",
     "recipes/lib/platform.srx",
     "recipes/packages/nginx/variants.srx",
     "recipes/packages/nginx/build.srx",
     "recipes/packages/nginx/steps.srx",
     "recipes/packages/nginx/integration.srx",
     "recipes/lib/gnu.srx",
-    "recipes/templates/autotools.srx",
+    "recipes/builders/autotools.srx",
     "recipes/packages/glibc/steps.srx",
     "recipes/packages/glibc/package.srx",
     "recipes/packages/glibc/releases.srx",
@@ -126,18 +123,17 @@ recipe_inputs = [
 variant = "minimal"
 system = "linux-x86_64-musl"
 factory = "nginx"
-toolchain = "toolchains/linux-x86_64-musl.toml"
+qualification = "qualification/nginx/checks.toml"
 recipe = "recipes/packages/nginx/package.srx"
 export = "nginx"
 contract = "recipes/packages/nginx/contracts/minimal.srx"
 contract_type = "Settings"
 recipe_inputs = [
     ".syrox-core",
-    "hosts/systemd/contract.toml",
     "recipes/support.srx",
-    "recipes/templates/recipe.srx",
-  "recipes/templates/configured.srx",
-    "recipes/templates/process.srx",
+    "recipes/builders/recipe.srx",
+  "recipes/builders/configured.srx",
+    "recipes/builders/process.srx",
     "recipes/lib/platform.srx",
     "recipes/packages/nginx/variants.srx",
     "recipes/packages/nginx/build.srx",
@@ -157,24 +153,23 @@ source = "recipes/packages/hello/releases.srx"
 [[releases.combinations]]
 variant = "default"
 system = "linux-x86_64-gnu"
-factory = "hello_version"
-toolchain = "toolchains/linux-x86_64-gnu.toml"
+factory = "hello"
+qualification = "qualification/hello/checks.toml"
 recipe = "recipes/packages/hello/package.srx"
 export = "hello"
 contract = "recipes/packages/hello/contracts/default.srx"
 contract_type = "Settings"
 recipe_inputs = [
     ".syrox-core",
-    "hosts/systemd/contract.toml",
     "recipes/support.srx",
-    "recipes/templates/recipe.srx",
-  "recipes/templates/configured.srx",
-    "recipes/templates/process.srx",
+    "recipes/builders/recipe.srx",
+  "recipes/builders/configured.srx",
+    "recipes/builders/process.srx",
     "recipes/lib/platform.srx",
     "recipes/packages/hello/variants.srx",
     "recipes/packages/hello/build.srx",
     "recipes/lib/gnu.srx",
-    "recipes/templates/autotools.srx",
+    "recipes/builders/autotools.srx",
     "recipes/packages/glibc/steps.srx",
     "recipes/packages/glibc/package.srx",
     "recipes/packages/glibc/releases.srx",
@@ -184,21 +179,20 @@ recipe_inputs = [
 [[releases.combinations]]
 variant = "default"
 system = "linux-x86_64-musl"
-factory = "hello_version"
-toolchain = "toolchains/linux-x86_64-musl.toml"
+factory = "hello"
+qualification = "qualification/hello/checks.toml"
 recipe = "recipes/packages/hello/package.srx"
 export = "hello"
 contract = "recipes/packages/hello/contracts/default.srx"
 contract_type = "Settings"
 recipe_inputs = [
     ".syrox-core",
-    "hosts/systemd/contract.toml",
     "recipes/support.srx",
-    "recipes/templates/recipe.srx",
-  "recipes/templates/configured.srx",
-    "recipes/templates/process.srx",
+    "recipes/builders/recipe.srx",
+  "recipes/builders/configured.srx",
+    "recipes/builders/process.srx",
     "recipes/lib/platform.srx",
     "recipes/packages/hello/variants.srx",
     "recipes/packages/hello/build.srx",
-    "recipes/templates/autotools.srx",
+    "recipes/builders/autotools.srx",
 ]

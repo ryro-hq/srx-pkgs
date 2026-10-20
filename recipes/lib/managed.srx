@@ -40,22 +40,22 @@ pub fn linker_flags() -> BuildText {
 }
 fn base_environment() -> [BuildEnv] {
     lib::toolchain::compiler_environment() ++ [
-        templates::process::env("PATH", lib::toolchain::search_path()),
-        templates::process::env("SHELL", build_path(lib::toolchain::tools("usr/bin/sh"))),
+        builders::process::env("PATH", lib::toolchain::search_path()),
+        builders::process::env("SHELL", build_path(lib::toolchain::tools("usr/bin/sh"))),
     ]
 }
 fn linker_environment() -> [BuildEnv] {
     [
-        templates::process::env("CC", build_path(lib::toolchain::compiler("usr/bin/cc"))),
-        templates::process::env("AR", build_path(lib::toolchain::tools("usr/bin/ar"))),
-        templates::process::env("RANLIB", build_path(lib::toolchain::tools("usr/bin/ranlib"))),
-        templates::process::env("CFLAGS", c_flags()),
-        templates::process::env("LDFLAGS", linker_flags()),
-        templates::process::env("LC_ALL", build_text("C")),
+        builders::process::env("CC", build_path(lib::toolchain::compiler("usr/bin/cc"))),
+        builders::process::env("AR", build_path(lib::toolchain::tools("usr/bin/ar"))),
+        builders::process::env("RANLIB", build_path(lib::toolchain::tools("usr/bin/ranlib"))),
+        builders::process::env("CFLAGS", c_flags()),
+        builders::process::env("LDFLAGS", linker_flags()),
+        builders::process::env("LC_ALL", build_text("C")),
     ]
 }
 pub fn environment() -> [BuildEnv] {
-    base_environment() ++ [templates::process::env(
+    base_environment() ++ [builders::process::env(
             "CONFIG_SHELL",
             build_path(lib::toolchain::tools("usr/bin/sh"))
         )] ++ linker_environment()
@@ -65,10 +65,7 @@ pub fn library_environment() -> [BuildEnv] {
 }
 pub fn script_environment() -> [BuildEnv] {
     base_environment() ++ [
-        templates::process::env("LC_ALL", build_text("C")),
-        templates::process::env(
-            "SYROX_BUILD_SHELL",
-            build_path(lib::toolchain::tools("usr/bin/sh"))
-        ),
+        builders::process::env("LC_ALL", build_text("C")),
+        builders::process::env("SYROX_BUILD_SHELL", build_path(lib::toolchain::tools("usr/bin/sh"))),
     ]
 }

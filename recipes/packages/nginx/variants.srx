@@ -4,7 +4,7 @@ fn reference(
     system: PackagePinText,
     build: fn(support::Source) -> Recipe
 ) -> PackageRef<contracts::minimal::Settings> {
-    templates::configured::reference<contracts::minimal::Settings>({
+    builders::configured::reference<contracts::minimal::Settings>({
             source = source;
             compatibility = compatibility;
             system = system;

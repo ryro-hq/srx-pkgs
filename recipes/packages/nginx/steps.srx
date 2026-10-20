@@ -15,7 +15,7 @@ pub fn build(
             // The runtime has already dropped capabilities and maps its owner
             // to namespace UID 0. nginx must retain that owner, as it does for
             // ordinary non-root execution, without consulting host passwd data.
-            templates::process::run(
+            builders::process::run(
                 BuildPath::Host("/bin/sh"),
                 cwd,
                 [
@@ -29,7 +29,7 @@ sed -i 's/geteuid() == 0/0/g; s/geteuid() != 0/1/g' src/core/nginx.c src/os/unix
                 ],
                 []
             ),
-            templates::process::run(
+            builders::process::run(
                 BuildPath::Host("/bin/sh"),
                 cwd,
                 [
@@ -56,7 +56,7 @@ sed -i 's/geteuid() == 0/0/g; s/geteuid() != 0/1/g' src/core/nginx.c src/os/unix
                 ] ++ static_link,
                 configure_environment
             ),
-            templates::process::run(
+            builders::process::run(
                 BuildPath::Host("/usr/bin/make"),
                 cwd,
                 [build_text("-j2")],

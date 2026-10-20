@@ -1,14 +1,14 @@
 // Experimental managed minimal HTTP build, with explicit seed and libc providers.
 pub fn managed_nginx(seed: lib::toolchain::Toolchain, libc: RecipeRef<Recipe>) -> Recipe {
-    templates::recipe::from_source({
+    builders::recipe::from_source({
             id = "nginx-minimal";
             source = releases::source("1.30.5");
             build = program();
-            build_inputs = templates::recipe::selected_inputs(lib::toolchain::select_inputs(seed) ++ [
+            build_inputs = builders::recipe::selected_inputs(lib::toolchain::select_inputs(seed) ++ [
                     recipe_output(libc, "dev"),
                     recipe_output(libc, "out")
                 ]);
-            commands = [templates::recipe::gnu_command("nginx", "usr/bin/nginx", libc, [])];
+            commands = [builders::recipe::gnu_command("nginx", "usr/bin/nginx", libc, [])];
         })
 }
 fn program() -> Build {
@@ -19,7 +19,7 @@ fn program() -> Build {
         timeout_seconds = 600;
         steps = [
             BuildStep::Extract(BuildPath::Work("source")),
-            templates::process::run(
+            builders::process::run(
                 BuildPath::Input(4, "usr/bin/sh"),
                 cwd,
                 [
@@ -55,7 +55,7 @@ fn program() -> Build {
                 ],
                 lib::managed::script_environment()
             ),
-            templates::process::run(
+            builders::process::run(
                 BuildPath::Input(4, "usr/bin/make"),
                 cwd,
                 [

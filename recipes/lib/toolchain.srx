@@ -44,11 +44,11 @@ pub fn search_path() -> BuildText {
 }
 pub fn compiler_environment() -> [BuildEnv] {
     [
-        templates::process::env(
+        builders::process::env(
             "GCC_EXEC_PREFIX",
             build_join([BuildPart::Path(compiler(gcc_root)), BuildPart::Literal("/")])
         ),
-        templates::process::env(
+        builders::process::env(
             "COMPILER_PATH",
             build_join([
                     BuildPart::Path(compiler(gcc_root)),
@@ -60,7 +60,7 @@ pub fn compiler_environment() -> [BuildEnv] {
 }
 // Perl data paths are declared inputs; compiled defaults are not a relocation proof.
 pub fn perl_environment() -> [BuildEnv] {
-    [templates::process::env(
+    [builders::process::env(
             "PERL5LIB",
             build_join([
                     BuildPart::Path(tools("usr/lib/perl5/5.42/core_perl")),

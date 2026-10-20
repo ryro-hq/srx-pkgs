@@ -1,12 +1,7 @@
-*.md
-!/README.md
 /.core/
 /.environment/
 /.store/
 /.evidence/
 /.release/
+/target/
 /build.toml
-
-!/docs/*.md
-!/hosts/systemd/README.md
-__pycache__/

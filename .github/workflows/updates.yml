@@ -1,63 +1,119 @@
-name: Stable updates
+name: Stable catalog updates
 on:
   schedule:
     - cron: '17 7 * * *'
   workflow_dispatch:
 permissions:
-  contents: write
-  pull-requests: write
-  actions: write
+  contents: read
 concurrency:
   group: stable-catalog-updates
   cancel-in-progress: false
 jobs:
-  updates:
+  prepare:
+    # Enabling requires an installed, narrowly scoped App and its own DCO identity.
+    if: vars.CATALOG_UPDATER_ENABLED == 'true' && vars.CATALOG_UPDATER_APP_ID != ''
     runs-on: ubuntu-24.04
+    outputs:
+      updates: ${{ steps.prepare.outputs.updates }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
+          persist-credentials: false
       - uses: ./.github/actions/core
+        with:
+          build: 'true'
       - name: Prepare isolated native maintenance tools
         run: docker build -f .github/maintenance.Containerfile -t syrox-maintenance:ci .github
-      - name: Discover stable releases through fixed official origins
+      - name: Discover and verify sources without write credentials
+        id: prepare
         run: |
           docker run --rm --user "$(id -u):$(id -g)" --dns-option single-request \
             --mount "type=bind,src=$PWD,dst=/catalog,readonly" \
-            syrox-maintenance:ci /catalog/.core/target/catalog-candidate/srx catalog updates /catalog > /tmp/syrox-updates.json
-      - name: Add signed versions and request checks against each exact PR SHA
-        env:
-          GH_TOKEN: ${{ secrets.SYROX_UPDATES_TOKEN }}
-        run: |
-          test -n "$GH_TOKEN"
-          gh auth setup-git
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            syrox-maintenance:ci /catalog/.core/target/catalog-candidate/srx catalog updates /catalog > /tmp/updates.json
+          mkdir -p /tmp/prepared-updates
+          jq -n '[]' > /tmp/prepared-updates/index.json
+          original=$(git rev-parse HEAD)
           while IFS=$'\t' read -r name version; do
-            [[ "$name" =~ ^[a-zA-Z0-9_-]+$ ]]
+            [[ "$name" =~ ^[a-z][a-z0-9_]*$ ]]
             [[ "$version" =~ ^[0-9]+(\.[0-9]+)+$ ]]
-            branch="updates/$name-$version"
-            if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
-              continue
-            fi
-            git switch --detach origin/main
-            git switch -c "$branch"
+            git reset --hard "$original"
+            git clean -fd -- changes
             docker run --rm --user "$(id -u):$(id -g)" --dns-option single-request \
               --mount "type=bind,src=$PWD,dst=/catalog" \
               syrox-maintenance:ci /catalog/.core/target/catalog-candidate/srx catalog add /catalog "$name" "$version"
             srx catalog generate . --check
             srx catalog check .
             srx catalog lock . --check
-            srx catalog matrix . > /tmp/syrox-new-matrix.json
             git add catalog.toml Catalog.lock Syrox.lock recipes changes
-            git commit -m "catalog: add $name $version without default promotion"
-            sha=$(git rev-parse HEAD)
-            git push origin "HEAD:refs/heads/$branch"
-            {
-              printf 'Adds %s %s from the fixed official channel. The pinned signing key authenticated the archive.\n\n' "$name" "$version"
-              printf 'The native change record includes source pins, contracts, toolchain inputs and every GNU/musl identity. Defaults remain unchanged.\n\n'
-              printf 'Required Catalog checks are dispatched against `%s`; publication requires real native execution and offline import for every matrix row.\n' "$sha"
-            } > /tmp/syrox-update-pr.txt
-            gh pr create --base main --head "$branch" --title "catalog: add $name $version" --body-file /tmp/syrox-update-pr.txt
-            gh workflow run catalog.yml --ref "$branch" -f "expected_sha=$sha"
-          done < <(jq -r '.[] | @tsv' /tmp/syrox-updates.json)
+            git diff --cached --binary --full-index > "/tmp/prepared-updates/$name-$version.patch"
+            pin=$(sha256sum "/tmp/prepared-updates/$name-$version.patch" | cut -d' ' -f1)
+            jq --arg name "$name" --arg version "$version" --arg pin "$pin" \
+              '. + [{name:$name,version:$version,sha256:$pin}]' /tmp/prepared-updates/index.json > /tmp/index.new
+            mv /tmp/index.new /tmp/prepared-updates/index.json
+          done < <(jq -r '.[] | @tsv' /tmp/updates.json)
+          echo "updates=$(jq -c . /tmp/prepared-updates/index.json)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: prepared-updates
+          path: /tmp/prepared-updates/*
+          if-no-files-found: error
+  propose:
+    needs: prepare
+    if: needs.prepare.outputs.updates != '[]'
+    runs-on: ubuntu-24.04
+    strategy:
+      max-parallel: 1
+      matrix:
+        update: ${{ fromJSON(needs.prepare.outputs.updates) }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: prepared-updates
+          path: /tmp/prepared-updates
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3
+        id: app
+        with:
+          app-id: ${{ vars.CATALOG_UPDATER_APP_ID }}
+          private-key: ${{ secrets.CATALOG_UPDATER_APP_PRIVATE_KEY }}
+          repositories: srx-pkgs
+          permission-contents: write
+          permission-pull-requests: write
+      - name: Publish only reviewed patch paths; never execute prepared code
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          APP_SLUG: ${{ steps.app.outputs.app-slug }}
+          PACKAGE: ${{ matrix.update.name }}
+          VERSION: ${{ matrix.update.version }}
+          PATCH_SHA256: ${{ matrix.update.sha256 }}
+        run: |
+          [[ "$PACKAGE" =~ ^[a-z][a-z0-9_]*$ ]]
+          [[ "$VERSION" =~ ^[0-9]+(\.[0-9]+)+$ ]]
+          [[ "$PATCH_SHA256" =~ ^[a-f0-9]{64}$ ]]
+          [[ "$APP_SLUG" =~ ^[A-Za-z0-9_-]+$ ]]
+          patch="/tmp/prepared-updates/$PACKAGE-$VERSION.patch"
+          test "$(sha256sum "$patch" | cut -d' ' -f1)" = "$PATCH_SHA256"
+          git -c core.hooksPath=/dev/null apply --index --check "$patch"
+          git -c core.hooksPath=/dev/null apply --index "$patch"
+          while IFS= read -r -d '' path; do
+            case "$path" in
+              catalog.toml|Catalog.lock|Syrox.lock|"recipes/packages/$PACKAGE/releases.srx"|"changes/$PACKAGE-$VERSION.json") ;;
+              *) printf 'Refusing unexpected prepared path: %s\n' "$path" >&2; exit 1;;
+            esac
+          done < <(git diff --cached --name-only -z)
+          bot_id=$(gh api "users/${APP_SLUG}[bot]" --jq .id)
+          [[ "$bot_id" =~ ^[0-9]+$ ]]
+          git config user.name "${APP_SLUG}[bot]"
+          git config user.email "$bot_id+${APP_SLUG}[bot]@users.noreply.github.com"
+          git -c core.hooksPath=/dev/null commit --signoff -m "build(catalog): add $PACKAGE $VERSION"
+          branch="updates/$PACKAGE-$VERSION"
+          gh auth setup-git
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then exit 0; fi
+          git push origin "HEAD:refs/heads/$branch"
+          printf 'Adds %s %s from its pinned official signing authority. Defaults remain unchanged.\n\nVerification: signed source validation, typed catalog check, exact locks. Full native qualification and release gates remain required.\n' "$PACKAGE" "$VERSION" > /tmp/update-pr.txt
+          gh pr create --base main --head "$branch" --title "build(catalog): add $PACKAGE $VERSION" --body-file /tmp/update-pr.txt

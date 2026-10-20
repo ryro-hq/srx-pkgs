@@ -5,18 +5,18 @@ pub fn managed(
     runtime_tools: OutputRef<Recipe>,
     source: support::Source
 ) -> Recipe {
-    templates::recipe::from_source({
+    builders::recipe::from_source({
             id = "git-minimal";
             source = source;
             build = program(source.version);
-            build_inputs = templates::recipe::selected_inputs(lib::toolchain::select_inputs(seed) ++ [
+            build_inputs = builders::recipe::selected_inputs(lib::toolchain::select_inputs(seed) ++ [
                     recipe_output(libc, "dev"),
                     recipe_output(libc, "out"),
                     recipe_output(zlib, "dev"),
                     recipe_output(zlib, "out"),
                     runtime_tools
                 ]);
-            commands = [templates::recipe::gnu_command(
+            commands = [builders::recipe::gnu_command(
                     "git",
                     "usr/bin/git",
                     libc,
@@ -32,21 +32,11 @@ fn program(version: PackagePinText) -> Build {
         source_format = BuildSourceFormat::Xz;
         timeout_seconds = 1200;
         steps = [
-            templates::process::run(
-                lib::toolchain::python("usr/bin/python3"),
-                BuildPath::Work(""),
-                [
-                    build_text("-I"),
-                    build_text("-c"),
-                    lib::runtime::static_validation(),
-                    build_path(lib::managed::git_tools("bin/sh")),
-                    build_path(lib::managed::git_tools("bin/cat"))
-                ],
-                lib::managed::script_environment()
-            ),
+            BuildStep::ValidateStaticElf(lib::managed::git_tools("bin/sh")),
+            BuildStep::ValidateStaticElf(lib::managed::git_tools("bin/cat")),
             BuildStep::Extract(BuildPath::Work("source")),
             // Upstream executes scripts directly; normalize their shebangs to the selected seed.
-            templates::process::run(
+            builders::process::run(
                 lib::toolchain::tools("usr/bin/sh"),
                 cwd,
                 [
@@ -56,7 +46,7 @@ fn program(version: PackagePinText) -> Build {
                 ],
                 lib::managed::script_environment()
             ),
-            templates::process::run(
+            builders::process::run(
                 lib::toolchain::tools("usr/bin/make"),
                 cwd,
                 [

@@ -1,6 +1,6 @@
 // Official static Linux amd64 binary, verified against sha256sum-amd64.txt.
 pub struct Selection {
-    version: PackagePinText = "1.37.1+k3s1";
+    version: PackagePinText;
 }
 pub fn k3s(const selection: Selection) -> PackageRef<contracts::default::Settings> {
     match selection.version {
@@ -21,7 +21,9 @@ fn reference() -> PackageRef<contracts::default::Settings> {
     )
 }
 pub fn recipe() -> std::Recipe {
-    std::recipe_value(std::package_recipe(k3s({})))
+    std::recipe_value(std::package_recipe(k3s({
+                    version = "1.37.1+k3s1";
+                })))
 }
 fn raw_recipe() -> std::Recipe {
     std::Recipe {
