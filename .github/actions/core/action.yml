@@ -70,5 +70,6 @@ runs:
         path: .core/target/catalog-candidate
     - shell: bash
       run: |
-        chmod 700 .core/target/catalog-candidate/{srx,syrox-worker,catalog-harness}
+        chmod 755 .core/target/catalog-candidate/{srx,syrox-worker}
+        chmod 700 .core/target/catalog-candidate/catalog-harness
         echo "$PWD/.core/target/catalog-candidate" >> "$GITHUB_PATH"

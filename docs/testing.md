@@ -28,6 +28,5 @@ Artifacts/caches are separated by host, core pin, environment and package identi
 
 Only root prose documents and `docs/*.md` are eligible for the conservative doc-only
 classification. Unknown paths, recipes, contracts, locks, dependency/tool/workflow
-changes run full qualification. `verify` also requires CodeQL and the strict SARIF
-gate, Cargo policy, workflow checks and retained-identity checks. The `success`
+changes run full qualification. `verify` also requires Cargo policy, workflow checks and retained-identity checks. The `success`
 context is transitional until required GitHub rules use `verify`.
