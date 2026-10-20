@@ -34,6 +34,7 @@ pub(super) fn today() -> Result<String> {
 }
 
 pub(super) fn exceptions() -> Result {
+    super::sarif::exceptions()?;
     let document: Value = serde_json::from_slice(&fs::read("security/exceptions.json")?)?;
     let configuration: toml::Value = toml::from_str(&fs::read_to_string("deny.toml")?)?;
     let records = document["exceptions"]
