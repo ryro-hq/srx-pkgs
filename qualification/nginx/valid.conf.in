@@ -1,0 +1,11 @@
+daemon off;
+error_log stderr;
+pid /tmp/nginx.pid;
+events {}
+http {
+  access_log off;
+  server {
+    listen 127.0.0.1:@{port};
+    location / { root /syrox/config/qualification; }
+  }
+}

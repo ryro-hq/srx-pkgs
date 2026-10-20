@@ -1,5 +1,5 @@
 pub struct Selection {
-    version: PackagePinText = "1.30.5";
+    version: PackagePinText;
     variant: PackagePinText = "minimal";
     system: PackagePinText = "";
     libc: PackagePinText = "";

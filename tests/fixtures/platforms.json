@@ -1,0 +1,174 @@
+{
+  "cases": [
+    [
+      "normalize linux-x86_64/",
+      "let packages = pkgs.forPlatform { system = \"linux-x86_64\"; libc = \"\"; };\n        fn expect(const text: PackagePinText, const target: PackagePinText) -> PackagePinText {\n            if text == target { text } else { match text { \"unexpected normalization\" => text } }\n        }\n        let resultSystem = expect(packages.platform.system, \"linux-x86_64\");\n        let resultLibc = expect(packages.platform.libc, \"gnu\");\n        let toolSystem = expect(packages.buildPlatform.system, \"linux-x86_64\");\n        let toolLibc = expect(packages.buildPlatform.libc, \"gnu\");\n    \n",
+      null
+    ],
+    [
+      "normalize linux-x86_64/gnu",
+      "let packages = pkgs.forPlatform { system = \"linux-x86_64\"; libc = \"gnu\"; };\n        fn expect(const text: PackagePinText, const target: PackagePinText) -> PackagePinText {\n            if text == target { text } else { match text { \"unexpected normalization\" => text } }\n        }\n        let resultSystem = expect(packages.platform.system, \"linux-x86_64\");\n        let resultLibc = expect(packages.platform.libc, \"gnu\");\n        let toolSystem = expect(packages.buildPlatform.system, \"linux-x86_64\");\n        let toolLibc = expect(packages.buildPlatform.libc, \"gnu\");\n    \n",
+      null
+    ],
+    [
+      "normalize linux-x86_64/musl",
+      "let packages = pkgs.forPlatform { system = \"linux-x86_64\"; libc = \"musl\"; };\n        fn expect(const text: PackagePinText, const target: PackagePinText) -> PackagePinText {\n            if text == target { text } else { match text { \"unexpected normalization\" => text } }\n        }\n        let resultSystem = expect(packages.platform.system, \"linux-x86_64\");\n        let resultLibc = expect(packages.platform.libc, \"musl\");\n        let toolSystem = expect(packages.buildPlatform.system, \"linux-x86_64\");\n        let toolLibc = expect(packages.buildPlatform.libc, \"gnu\");\n    \n",
+      null
+    ],
+    [
+      "normalize linux-x86_64-gnu/",
+      "let packages = pkgs.forPlatform { system = \"linux-x86_64-gnu\"; libc = \"\"; };\n        fn expect(const text: PackagePinText, const target: PackagePinText) -> PackagePinText {\n            if text == target { text } else { match text { \"unexpected normalization\" => text } }\n        }\n        let resultSystem = expect(packages.platform.system, \"linux-x86_64\");\n        let resultLibc = expect(packages.platform.libc, \"gnu\");\n        let toolSystem = expect(packages.buildPlatform.system, \"linux-x86_64\");\n        let toolLibc = expect(packages.buildPlatform.libc, \"gnu\");\n    \n",
+      null
+    ],
+    [
+      "normalize linux-x86_64-musl/",
+      "let packages = pkgs.forPlatform { system = \"linux-x86_64-musl\"; libc = \"\"; };\n        fn expect(const text: PackagePinText, const target: PackagePinText) -> PackagePinText {\n            if text == target { text } else { match text { \"unexpected normalization\" => text } }\n        }\n        let resultSystem = expect(packages.platform.system, \"linux-x86_64\");\n        let resultLibc = expect(packages.platform.libc, \"musl\");\n        let toolSystem = expect(packages.buildPlatform.system, \"linux-x86_64\");\n        let toolLibc = expect(packages.buildPlatform.libc, \"gnu\");\n    \n",
+      null
+    ],
+    [
+      "normalize linux-aarch64/",
+      "let packages = pkgs.forPlatform { system = \"linux-aarch64\"; libc = \"\"; };\n        fn expect(const text: PackagePinText, const target: PackagePinText) -> PackagePinText {\n            if text == target { text } else { match text { \"unexpected normalization\" => text } }\n        }\n        let resultSystem = expect(packages.platform.system, \"linux-aarch64\");\n        let resultLibc = expect(packages.platform.libc, \"gnu\");\n        let toolSystem = expect(packages.buildPlatform.system, \"linux-x86_64\");\n        let toolLibc = expect(packages.buildPlatform.libc, \"gnu\");\n    \n",
+      null
+    ],
+    [
+      "normalize linux-aarch64/musl",
+      "let packages = pkgs.forPlatform { system = \"linux-aarch64\"; libc = \"musl\"; };\n        fn expect(const text: PackagePinText, const target: PackagePinText) -> PackagePinText {\n            if text == target { text } else { match text { \"unexpected normalization\" => text } }\n        }\n        let resultSystem = expect(packages.platform.system, \"linux-aarch64\");\n        let resultLibc = expect(packages.platform.libc, \"musl\");\n        let toolSystem = expect(packages.buildPlatform.system, \"linux-x86_64\");\n        let toolLibc = expect(packages.buildPlatform.libc, \"gnu\");\n    \n",
+      null
+    ],
+    [
+      "inherited pkgs.forPlatform { system = \"linux-x86_64\"; }/1.30.5",
+      "let packages = pkgs.forPlatform { system = \"linux-x86_64\"; }; services.nginx = { package = packages.nginx { version = \"1.30.5\"; }; settings = { listen = 8080; }; };\n",
+      null
+    ],
+    [
+      "inherited pkgs.forPlatform { system = \"linux-x86_64\"; }/1.30.6",
+      "let packages = pkgs.forPlatform { system = \"linux-x86_64\"; }; services.nginx = { package = packages.nginx { version = \"1.30.6\"; }; settings = { listen = 8080; }; };\n",
+      null
+    ],
+    [
+      "inherited pkgs.forPlatform { system = \"linux-x86_64\"; libc = \"musl\"; }/1.30.5",
+      "let packages = pkgs.forPlatform { system = \"linux-x86_64\"; libc = \"musl\"; }; services.nginx = { package = packages.nginx { version = \"1.30.5\"; }; settings = { listen = 8080; }; };\n",
+      null
+    ],
+    [
+      "inherited pkgs.forPlatform { system = \"linux-x86_64\"; libc = \"musl\"; }/1.30.6",
+      "let packages = pkgs.forPlatform { system = \"linux-x86_64\"; libc = \"musl\"; }; services.nginx = { package = packages.nginx { version = \"1.30.6\"; }; settings = { listen = 8080; }; };\n",
+      null
+    ],
+    [
+      "inherited pkgs.forSystem(\"linux-x86_64-musl\")/1.30.5",
+      "let packages = pkgs.forPlatform({system = \"linux-x86_64-musl\";}); services.nginx = { package = packages.nginx { version = \"1.30.5\"; }; settings = { listen = 8080; }; };\n",
+      null
+    ],
+    [
+      "inherited pkgs.forSystem(\"linux-x86_64-musl\")/1.30.6",
+      "let packages = pkgs.forPlatform({system = \"linux-x86_64-musl\";}); services.nginx = { package = packages.nginx { version = \"1.30.6\"; }; settings = { listen = 8080; }; };\n",
+      null
+    ],
+    [
+      "direct pkgs.nginx { version = \"1.30.6\"; }",
+      "services.nginx = { package = pkgs.nginx { version = \"1.30.6\"; }; settings = {}; };\n",
+      null
+    ],
+    [
+      "direct pkgs.nginx { version = \"1.30.6\"; libc = \"musl\"; }",
+      "services.nginx = { package = pkgs.nginx { version = \"1.30.6\"; libc = \"musl\"; }; settings = {}; };\n",
+      null
+    ],
+    [
+      "direct pkgs.nginx { version = \"1.30.6\"; system = \"linux-x86_64-musl\"; }",
+      "services.nginx = { package = pkgs.nginx { version = \"1.30.6\"; system = \"linux-x86_64-musl\"; }; settings = {}; };\n",
+      null
+    ],
+    [
+      "invalid libc = \"musl\";",
+      "let packages = pkgs.forPlatform { libc = \"musl\"; };\n",
+      "missing field `system`"
+    ],
+    [
+      "invalid system = \"linux\";",
+      "let packages = pkgs.forPlatform { system = \"linux\"; };\n",
+      "explicit_architecture"
+    ],
+    [
+      "invalid system = \"linux-arm\";",
+      "let packages = pkgs.forPlatform { system = \"linux-arm\"; };\n",
+      "explicit_architecture"
+    ],
+    [
+      "invalid system = \"linux-x86_64-musl\"; libc = \"gnu\";",
+      "let packages = pkgs.forPlatform { system = \"linux-x86_64-musl\"; libc = \"gnu\"; };\n",
+      "require_musl"
+    ],
+    [
+      "invalid system = \"linux-x86_64-gnu\"; libc = \"musl\";",
+      "let packages = pkgs.forPlatform { system = \"linux-x86_64-gnu\"; libc = \"musl\"; };\n",
+      "require_gnu"
+    ],
+    [
+      "invalid system = \"linux-x86_64\"; libc = \"unknown\";",
+      "let packages = pkgs.forPlatform { system = \"linux-x86_64\"; libc = \"unknown\"; };\n",
+      "normalize_libc"
+    ],
+    [
+      "contradictory system = \"linux-x86_64-gnu\";",
+      "let packages = pkgs.forPlatform { system = \"linux-x86_64\"; libc = \"musl\"; }; let selected = packages.nginx { version = \"1.30.6\"; system = \"linux-x86_64-gnu\"; };\n",
+      "no applicable case"
+    ],
+    [
+      "contradictory libc = \"gnu\";",
+      "let packages = pkgs.forPlatform { system = \"linux-x86_64\"; libc = \"musl\"; }; let selected = packages.nginx { version = \"1.30.6\"; libc = \"gnu\"; };\n",
+      "no applicable case"
+    ],
+    [
+      "contradictory system = \"linux-aarch64\";",
+      "let packages = pkgs.forPlatform { system = \"linux-x86_64\"; libc = \"musl\"; }; let selected = packages.nginx { version = \"1.30.6\"; system = \"linux-aarch64\"; };\n",
+      "no applicable case"
+    ],
+    [
+      "matching ",
+      "let packages = pkgs.forPlatform { system = \"linux-x86_64\"; libc = \"musl\"; }; let selected = packages.nginx { version = \"1.30.6\";  };\n",
+      null
+    ],
+    [
+      "matching system = \"linux-x86_64\";",
+      "let packages = pkgs.forPlatform { system = \"linux-x86_64\"; libc = \"musl\"; }; let selected = packages.nginx { version = \"1.30.6\"; system = \"linux-x86_64\"; };\n",
+      null
+    ],
+    [
+      "matching system = \"linux-x86_64-musl\";",
+      "let packages = pkgs.forPlatform { system = \"linux-x86_64\"; libc = \"musl\"; }; let selected = packages.nginx { version = \"1.30.6\"; system = \"linux-x86_64-musl\"; };\n",
+      null
+    ],
+    [
+      "matching libc = \"musl\";",
+      "let packages = pkgs.forPlatform { system = \"linux-x86_64\"; libc = \"musl\"; }; let selected = packages.nginx { version = \"1.30.6\"; libc = \"musl\"; };\n",
+      null
+    ],
+    [
+      "Hello set gnu",
+      "let packages = pkgs.forPlatform { system = \"linux-x86_64\"; libc = \"gnu\"; }; let selected = packages.hello { version = \"2.12.1\"; }; outputs { shell: Shell = Shell { pkgs = [select_command(package_recipe(selected), \"out\", \"hello\")]; services = []; }; }\n",
+      null
+    ],
+    [
+      "Hello set musl",
+      "let packages = pkgs.forPlatform { system = \"linux-x86_64\"; libc = \"musl\"; }; let selected = packages.hello { version = \"2.12.1\"; }; outputs { shell: Shell = Shell { pkgs = [select_command(package_recipe(selected), \"out\", \"hello\")]; services = []; }; }\n",
+      null
+    ],
+    [
+      "consistent explicit set",
+      "let packages: pkgs::PackageSet = {\n        platform = { system = \"linux-x86_64\"; libc = \"gnu\"; };\n        buildPlatform = { system = \"linux-x86_64\"; libc = \"gnu\"; };\n    };\n    services.nginx = { package = packages.nginx { version = \"1.30.6\"; }; settings = {}; };\n",
+      null
+    ],
+    [
+      "unsupported build libc",
+      "let packages: pkgs::PackageSet = {\n        platform = { system = \"linux-x86_64\"; libc = \"gnu\"; };\n        buildPlatform = { system = \"linux-x86_64\"; libc = \"musl\"; };\n    };\n    services.nginx = { package = packages.nginx { version = \"1.30.6\"; }; settings = {}; };\n",
+      "no applicable case"
+    ],
+    [
+      "unsupported build architecture",
+      "let packages: pkgs::PackageSet = {\n        platform = { system = \"linux-x86_64\"; libc = \"gnu\"; };\n        buildPlatform = { system = \"linux-aarch64\"; libc = \"gnu\"; };\n    };\n    services.nginx = { package = packages.nginx { version = \"1.30.6\"; }; settings = {}; };\n",
+      "no applicable case"
+    ]
+  ]
+}

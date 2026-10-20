@@ -1,9 +1,0 @@
-pub fn gnu(source: support::Source) -> Recipe {
-    templates::recipe::from_source({
-        id = "@{name}";
-        source = source;
-        build = lib::gnu::autotools({source_directory = @{directory}; timeout_seconds = 180;});
-        build_inputs = templates::recipe::selected_inputs([recipe_output(glibc::runtime, "dev"), recipe_output(glibc::runtime, "out")]);
-        // Declare command paths only after reviewing the package's installed outputs.
-    })
-}

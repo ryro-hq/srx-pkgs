@@ -8,21 +8,21 @@ pub fn configure_environment() -> [BuildEnv] {
 }
 fn compiler_environment(probe: BuildLiteral) -> [BuildEnv] {
     [
-        templates::process::env("CC", build_path(BuildPath::Work("cc"))),
-        templates::process::env(
+        builders::process::env("CC", build_path(BuildPath::Work("cc"))),
+        builders::process::env(
             "CPP",
             build_join([BuildPart::Path(BuildPath::Work("cc")), BuildPart::Literal(" -E")])
         ),
-        templates::process::env("LIBC_DEV", build_path(BuildPath::Input(0, ""))),
-        templates::process::env("LIBC_OUT", build_path(BuildPath::Input(1, ""))),
-        templates::process::env("LIBRARY_PATH", build_path(BuildPath::Input(1, "usr/lib"))),
-        templates::process::env("CONFIGURE_PROBE", build_text(probe))
+        builders::process::env("LIBC_DEV", build_path(BuildPath::Input(0, ""))),
+        builders::process::env("LIBC_OUT", build_path(BuildPath::Input(1, ""))),
+        builders::process::env("LIBRARY_PATH", build_path(BuildPath::Input(1, "usr/lib"))),
+        builders::process::env("CONFIGURE_PROBE", build_text(probe))
     ]
 }
 pub fn setup() -> [BuildStep] {
     [
         BuildStep::Directory(BuildPath::Work("kernel-headers")),
-        templates::process::run(
+        builders::process::run(
             BuildPath::Host("/bin/sh"),
             BuildPath::Work("kernel-headers"),
             [
@@ -56,17 +56,17 @@ exec /usr/bin/gcc -B"$LIBC_DEV/usr/lib/" -nostdinc -isystem "$include" -isystem 
     ]
 }
 pub fn autotools(options: BuildOptions) -> Build {
-    let prefix = [templates::process::env(
+    let prefix = [builders::process::env(
             "SYROX_OUTPUT_PREFIX",
             build_path(BuildPath::Installed("out", "usr"))
         )];
-    templates::autotools::build({
+    builders::autotools::build({
             directory = options.source_directory;
             timeout_seconds = options.timeout_seconds;
             before = setup();
             configure = [
                 build_text("./configure"),
-                templates::process::argument("--prefix=", BuildPath::Installed("out", "usr")),
+                builders::process::argument("--prefix=", BuildPath::Installed("out", "usr")),
                 build_text("--disable-nls")
             ];
             environment = environment() ++ prefix;

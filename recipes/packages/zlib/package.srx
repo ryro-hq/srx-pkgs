@@ -1,27 +1,19 @@
 // Managed construction requires the explicit providers documented in README.
 pub struct Selection {
-    version: PackagePinText = "1.3.2";
+    version: PackagePinText;
     system: PackagePinText = "";
     libc: PackagePinText = "";
 }
-pub fn zlib_version(
-    const selection: Selection,
-    seed: lib::toolchain::Toolchain,
-    libc: RecipeRef<Recipe>
-) -> RecipeRef<Recipe> {
+pub fn zlib(const selection: Selection, seed: lib::toolchain::Toolchain, libc: RecipeRef<Recipe>) -> RecipeRef<Recipe> {
     let source = releases::source(selection.version);
     let system = lib::platform::gnu_x86_64({
             system = selection.system;
             libc = selection.libc;
         });
     recipe_ref(fn() -> Recipe {
-            templates::recipe::named_recipe(
+            builders::recipe::named_recipe(
                 build::managed(seed, libc, source),
                 "zlib-${source.version}-${system}"
             )
         })
-}
-// Compatible factory: no implicit seed, package realization or host fallback.
-pub fn managed_zlib(seed: lib::toolchain::Toolchain, libc: RecipeRef<Recipe>) -> Recipe {
-    build::managed(seed, libc, releases::source("1.3.2"))
 }

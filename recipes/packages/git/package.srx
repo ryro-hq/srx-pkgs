@@ -1,10 +1,10 @@
 // Managed construction requires the explicit providers documented in README.
 pub struct Selection {
-    version: PackagePinText = "2.55.0";
+    version: PackagePinText;
     system: PackagePinText = "";
     libc: PackagePinText = "";
 }
-pub fn git_version(
+pub fn git(
     const selection: Selection,
     seed: lib::toolchain::Toolchain,
     libc: RecipeRef<Recipe>,
@@ -17,18 +17,9 @@ pub fn git_version(
             libc = selection.libc;
         });
     recipe_ref(fn() -> Recipe {
-            templates::recipe::named_recipe(
+            builders::recipe::named_recipe(
                 build::managed(seed, libc, zlib, runtime_tools, source),
                 "git-minimal-${source.version}-${system}"
             )
         })
-}
-// Compatible factory: no implicit seed, package realization or host fallback.
-pub fn managed_git(
-    seed: lib::toolchain::Toolchain,
-    libc: RecipeRef<Recipe>,
-    zlib: RecipeRef<Recipe>,
-    runtime_tools: OutputRef<Recipe>
-) -> Recipe {
-    build::managed(seed, libc, zlib, runtime_tools, releases::source("2.55.0"))
 }

@@ -12,10 +12,10 @@ fn configuration() -> std::ConfigText {
 outputs {
     os: std::Os = {
         pkgs = [];
-        services = [packages::k3s_service(std::package_recipe(packages::k3s({})), configuration())];
+        services = [packages::k3s_service(std::package_recipe(packages::k3s({version = "1.37.1+k3s1";})), configuration())];
     };
     dev: std::Shell = {
-        pkgs = [std::select_command(std::package_recipe(packages::k3s({})), "out", "k3s")];
+        pkgs = [std::select_command(std::package_recipe(packages::k3s({version = "1.37.1+k3s1";})), "out", "k3s")];
         services = [];
     };
 }

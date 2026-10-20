@@ -2,9 +2,6 @@
 pub struct PackageSet {
     platform: lib::platform::Platform;
     buildPlatform: lib::platform::Platform;
-    // Legacy full tags remain available to existing forSystem callers.
-    resultSystem: PackagePinText;
-    toolsSystem: PackagePinText;
 }
 pub fn forPlatform(const selection: lib::platform::PlatformSelection) -> PackageSet {
     let target = lib::platform::normalize(selection);
@@ -14,14 +11,7 @@ pub fn forPlatform(const selection: lib::platform::PlatformSelection) -> Package
     PackageSet {
         platform = target;
         buildPlatform = tools;
-        resultSystem = lib::platform::tag(target);
-        toolsSystem = lib::platform::tag(tools);
     }
-}
-pub fn forSystem(const system: PackagePinText) -> PackageSet {
-    forPlatform({
-            system = system;
-        })
 }
 fn require_same_platform(const requested: PackagePinText, const inherited: PackagePinText) -> PackagePinText {
     match inherited {
@@ -39,17 +29,11 @@ fn require_same_platform(const requested: PackagePinText, const inherited: Packa
         },
     }
 }
-// Public legacy fields remain readable. Validate them when a set selects a package,
-// including sets constructed explicitly instead of through forPlatform.
+// Validate explicitly constructed sets before selecting a build.
 fn checked_platform(const packages: PackageSet) -> lib::platform::Platform {
-    let result = require_same_platform(packages.resultSystem, lib::platform::tag(packages.platform));
-    let tools = require_same_platform(
-        lib::platform::tag(packages.buildPlatform),
-        "linux-x86_64-gnu"
-    );
-    match require_same_platform(packages.toolsSystem, tools) {
+    match require_same_platform(lib::platform::tag(packages.buildPlatform), "linux-x86_64-gnu") {
         "linux-x86_64-gnu" => lib::platform::normalize({
-                system = result;
+                system = lib::platform::tag(packages.platform);
             })
     }
 }
@@ -93,8 +77,8 @@ impl PackageSet {
                     ));
             })
     }
-    fn hello_version(const packages: Self, const selection: project::HelloSelection) -> _ {
-        project::hello_version({
+    fn hello(const packages: Self, const selection: project::HelloSelection) -> _ {
+        project::hello({
                 version = selection.version;
                 variant = selection.variant;
                 system = lib::platform::tag(result_platform(
@@ -107,7 +91,7 @@ impl PackageSet {
             })
     }
     fn glibc(const packages: Self, const selection: project::GlibcSelection) -> RecipeRef<Recipe> {
-        project::glibc_version({
+        project::glibc({
                 version = selection.version;
                 system = lib::platform::tag(result_platform(
                         packages,
@@ -123,7 +107,7 @@ impl PackageSet {
         const selection: project::GlibcSelection,
         seed: lib::toolchain::Toolchain
     ) -> RecipeRef<Recipe> {
-        project::managed_glibc_version(
+        project::managed_glibc(
             {
                 version = selection.version;
                 system = lib::platform::tag(result_platform(
@@ -143,7 +127,7 @@ impl PackageSet {
         seed: lib::toolchain::Toolchain,
         libc: RecipeRef<Recipe>
     ) -> RecipeRef<Recipe> {
-        project::zlib_version(
+        project::zlib(
             {
                 version = selection.version;
                 system = lib::platform::tag(result_platform(
@@ -166,7 +150,7 @@ impl PackageSet {
         zlib: RecipeRef<Recipe>,
         runtime_tools: OutputRef<Recipe>
     ) -> RecipeRef<Recipe> {
-        project::git_version(
+        project::git(
             {
                 version = selection.version;
                 system = lib::platform::tag(result_platform(

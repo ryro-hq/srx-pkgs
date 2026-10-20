@@ -1,0 +1,59 @@
+{
+  "schema": 1,
+  "packages": [
+    {
+      "name": "nginx",
+      "version": "1.30.5",
+      "license": "BSD-2-Clause",
+      "url": "https://nginx.org/download/nginx-1.30.5.tar.gz",
+      "sha256": "6c20565aa2325cb82216ae804f4a4ff1875179014759a381c42ddc8e11c4906d",
+      "purl": "pkg:generic/nginx@1.30.5",
+      "cpe": "cpe:2.3:a:f5:nginx:1.30.5:*:*:*:*:*:*:*",
+      "license_files": [
+        "LICENSE"
+      ]
+    },
+    {
+      "name": "nginx",
+      "version": "1.30.6",
+      "license": "BSD-2-Clause",
+      "url": "https://nginx.org/download/nginx-1.30.6.tar.gz",
+      "sha256": "3cf46f5ed7504d460125866b7bea99fb357f31d887e2e63b35503310e9b8b6c8",
+      "purl": "pkg:generic/nginx@1.30.6",
+      "cpe": "cpe:2.3:a:f5:nginx:1.30.6:*:*:*:*:*:*:*",
+      "license_files": [
+        "LICENSE"
+      ]
+    },
+    {
+      "name": "hello",
+      "version": "2.12.1",
+      "license": "GPL-3.0-or-later",
+      "url": "https://ftp.gnu.org/gnu/hello/hello-2.12.1.tar.gz",
+      "sha256": "8d99142afd92576f30b0cd7cb42a8dc6809998bc5d607d88761f512e26c7db20",
+      "purl": "pkg:generic/hello@2.12.1",
+      "cpe": "cpe:2.3:a:gnu:hello:2.12.1:*:*:*:*:*:*:*",
+      "license_files": [
+        "COPYING"
+      ]
+    },
+    {
+      "name": "glibc",
+      "version": "2.44",
+      "role": "gnu-runtime",
+      "license": "LGPL-2.1-or-later AND LGPL-2.0-or-later AND GPL-2.0-or-later AND BSD-3-Clause AND ISC",
+      "recipe_source": "recipes/packages/glibc/releases.srx",
+      "url": "https://ftp.gnu.org/gnu/glibc/glibc-2.44.tar.xz",
+      "sha256": "37f600f2bef3c5e8300147059568b2a2e40a7ad6ccc65ce942556d49429cc667",
+      "purl": "pkg:generic/glibc@2.44",
+      "cpe": "cpe:2.3:a:gnu:glibc:2.44:*:*:*:*:*:*:*",
+      "license_files": [
+        "COPYING.LIB",
+        "COPYING.LESSERv2",
+        "COPYINGv2",
+        "COPYINGv3",
+        "LICENSES"
+      ]
+    }
+  ]
+}

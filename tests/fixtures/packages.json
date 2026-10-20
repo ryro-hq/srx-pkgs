@@ -1,0 +1,115 @@
+{
+  "cases": [
+    [
+      "package_recipe(packages.k3s { version = \"1.37.1+k3s1\"; })",
+      "k3s-1.37.1+k3s1-binary-linux-x86_64-gnu-",
+      null
+    ],
+    [
+      "package_recipe(pkgs.k3s { version = \"1.37.1+k3s1\"; })",
+      "k3s-1.37.1+k3s1-binary-linux-x86_64-gnu-",
+      null
+    ],
+    [
+      "packages.glibc { version = \"2.44\"; }",
+      "glibc-2.44-linux-x86_64-gnu",
+      null
+    ],
+    [
+      "pkgs.glibc { version = \"2.44\"; }",
+      "glibc-2.44-linux-x86_64-gnu",
+      null
+    ],
+    [
+      "packages.managed_glibc({ version = \"2.44\"; }, seed)",
+      "glibc-managed-2.44-linux-x86_64-gnu",
+      null
+    ],
+    [
+      "packages.zlib({ version = \"1.3.2\"; }, seed, libc)",
+      "zlib-1.3.2-linux-x86_64-gnu",
+      null
+    ],
+    [
+      "packages.git({ version = \"2.55.0\"; }, seed, libc, zlib, recipe_output(provider, \"tools\"))",
+      "git-minimal-2.55.0-linux-x86_64-gnu",
+      null
+    ],
+    [
+      "pkgs.zlib({ version = \"1.3.2\"; }, seed, libc)",
+      "zlib-1.3.2-linux-x86_64-gnu",
+      null
+    ],
+    [
+      "pkgs.git({ version = \"2.55.0\"; }, seed, libc, zlib, recipe_output(provider, \"tools\"))",
+      "git-minimal-2.55.0-linux-x86_64-gnu",
+      null
+    ],
+    [
+      "package_recipe(packages.k3s { version = \"1.37.0+k3s1\"; })",
+      null,
+      "no applicable case"
+    ],
+    [
+      "package_recipe(pkgs.forPlatform({system = \"linux-x86_64-musl\";}).k3s { version = \"1.37.1+k3s1\"; })",
+      null,
+      "no applicable case"
+    ],
+    [
+      "packages.glibc { version = \"2.4\"; }",
+      null,
+      "no applicable case"
+    ],
+    [
+      "packages.glibc { version = \"2.45\"; }",
+      null,
+      "no applicable case"
+    ],
+    [
+      "packages.zlib({ version = \"1.3\"; }, seed, libc)",
+      null,
+      "no applicable case"
+    ],
+    [
+      "packages.git({ version = \"2.55\"; }, seed, libc, zlib, recipe_output(provider, \"tools\"))",
+      null,
+      "no applicable case"
+    ],
+    [
+      "pkgs.glibc { version = \"2.44\"; libc = \"musl\"; }",
+      null,
+      "no applicable case"
+    ],
+    [
+      "pkgs.glibc { version = \"2.44\"; system = \"linux-aarch64\"; }",
+      null,
+      "no applicable case"
+    ],
+    [
+      "packages.glibc { version = \"2.44\"; libc = \"musl\"; }",
+      null,
+      "no applicable case"
+    ],
+    [
+      "packages.zlib({ version = \"1.3.2\"; system = \"linux-x86_64-musl\"; }, seed, libc)",
+      null,
+      "no applicable case"
+    ],
+    [
+      "pkgs::bootstrap",
+      null,
+      "unknown"
+    ],
+    [
+      "pkgs::versioned_hello_2_12_1_gnu",
+      null,
+      "unknown"
+    ],
+    [
+      "pkgs::versioned_k3s_1_37_1_gnu",
+      null,
+      "unknown"
+    ]
+  ],
+  "seed": "\nlet provider = recipe_ref(fn() -> Recipe {\n    Recipe { package = Package { id = \"projection-seed\"; dependencies = []; };\n        imported = Option::Some(ImportedResult { root = \"projection-only\"; manifest = \"b76dc3395480b77bc6cd9ff89a9ca81e478bf3b2be344d6f1dcf4615bc146bf8\";\n            entries = [ImportedOutput { output = \"compiler\"; key = \"compiler\"; },ImportedOutput { output = \"python\"; key = \"python\"; },ImportedOutput { output = \"runtime\"; key = \"runtime\"; },ImportedOutput { output = \"sysroot\"; key = \"sysroot\"; },ImportedOutput { output = \"tools\"; key = \"tools\"; }]; }); }\n});\nlet seed: pkgs::Toolchain = {\n    compiler = recipe_output(provider, \"compiler\"); python = recipe_output(provider, \"python\");\n    runtime = recipe_output(provider, \"runtime\"); sysroot = recipe_output(provider, \"sysroot\");\n    tools = recipe_output(provider, \"tools\");\n};\nlet libc = packages.managed_glibc({ version = \"2.44\"; }, seed);\nlet zlib = packages.zlib({ version = \"1.3.2\"; }, seed, libc);\n"
+}

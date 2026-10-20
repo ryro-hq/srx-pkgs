@@ -1,0 +1,15 @@
+command = "nginx"
+version_arguments = ["-v"]
+
+[http]
+filename = "nginx.conf"
+configuration = "qualification/nginx/valid.conf.in"
+invalid_configuration = "qualification/nginx/invalid.conf"
+validate_arguments = ["-t", "-c", "@{config}"]
+run_arguments = ["-c", "@{config}"]
+response = "syrox-qualified"
+
+[service]
+project = "qualification/nginx/service.srx.in"
+valid_settings = "qualification/nginx/valid-settings.srx.in"
+invalid_settings = "qualification/nginx/invalid-settings.srx.in"

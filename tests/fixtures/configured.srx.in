@@ -1,0 +1,26 @@
+
+pub value Settings(str);
+value Other(str);
+fn build(source: support::Source) -> Recipe {
+    Recipe { package = Package { id = "fixture"; dependencies = []; };
+        acquisition = Option::Some(Acquisition {
+            sources = [source_request(source.url, source.sha256, source.maximum_bytes)]; });
+        build = Option::Some(Build { source_directory = "fixture"; timeout_seconds = 1;
+            profile = BuildProfile::HostBootstrap; source_format = BuildSourceFormat::Raw;
+            steps = [BuildStep::Copy(BuildPath::Source, BuildPath::Output("out", "data"))]; }); }
+}
+fn render(settings: Settings) -> ConfigText { "config:${settings}" }
+fn other(settings: Other) -> ConfigText { "other:${settings}" }
+fn integrate(recipe: RecipeRef<Recipe>, text: ConfigText) -> Service {
+    Service { id = "fixture"; pkgs = [select_package(recipe)];
+        files = [ConfigFile { path = "config"; text = text; }]; }
+}
+pub fn selected() -> PackageRef<Settings> {
+    builders::configured::reference<Settings>({
+        source = { version = "1.0"; url = "https://example.org/source.tar.gz";
+            sha256 = "0000000000000000000000000000000000000000000000000000000000000000"; maximum_bytes = 1024; };
+        compatibility = { id = "default"; pin = "contract-v1"; };
+        system = "linux-x86_64-gnu"; build = build; render = RENDER;
+        INTEGRATE
+    })
+}

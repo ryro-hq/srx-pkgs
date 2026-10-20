@@ -1,10 +1,10 @@
 pub struct Selection {
-    version: PackagePinText = "2.12.1";
+    version: PackagePinText;
     variant: PackagePinText = "default";
     system: PackagePinText = "";
     libc: PackagePinText = "";
 }
-pub fn hello_version(const selection: Selection) -> _ {
+pub fn hello(const selection: Selection) -> _ {
     let target = lib::platform::direct({
             system = selection.system;
             libc = selection.libc;
