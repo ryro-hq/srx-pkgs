@@ -203,7 +203,7 @@ pub(super) fn tools(destination: &Path, selection: &str) -> Result {
             .arg(&archive)
             .arg("--directory")
             .arg(temporary.path())
-            .args(["--no-same-owner", "--no-same-permissions", "--", name])
+            .args(["--no-same-owner", "--no-same-permissions", "--", &entry])
             .status()?
             .success()
         {
