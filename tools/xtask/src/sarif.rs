@@ -20,6 +20,19 @@ pub(super) fn check(directory: &Path, language: &str) -> Result {
             return Err("oversized SARIF report".into());
         }
         let document: Value = serde_json::from_slice(&fs::read(&report)?)?;
+        if !document["runs"].as_array().is_some_and(|runs| {
+            runs.iter().any(|run| {
+                run["tool"]["extensions"]
+                    .as_array()
+                    .is_some_and(|extensions| {
+                        extensions.iter().any(|component| {
+                            component["name"] == format!("codeql/{language}-queries")
+                        })
+                    })
+            })
+        }) {
+            return Err("SARIF lacks the expected CodeQL language query pack".into());
+        }
         validate_with(&document, &exceptions)?;
     }
     println!("CodeQL {language}: analysis succeeded; no unreviewed high/critical findings");
@@ -85,8 +98,17 @@ fn validate_with(document: &Value, exceptions: &[Value]) -> Result {
                 }
                 // Inline SARIF suppression cannot weaken this gate. Exceptions need
                 // separate, reviewed policy with expiry before they are supported.
-                if severity >= 7.0 && !excepted(result, id, exceptions) {
-                    return Err(format!("high/critical CodeQL finding: {id} ({severity})").into());
+                if severity >= 7.0 {
+                    if !excepted(result, id, exceptions) {
+                        return Err(
+                            format!("high/critical CodeQL finding: {id} ({severity})").into()
+                        );
+                    }
+                    println!(
+                        "Reviewed CodeQL exception: {id} at {}:{}",
+                        result["locations"][0]["physicalLocation"]["artifactLocation"]["uri"],
+                        result["locations"][0]["physicalLocation"]["region"]["startLine"]
+                    );
                 }
             } else if result["level"] == "error"
                 || rule["properties"]["tags"]
@@ -188,8 +210,7 @@ fn load_exceptions() -> Result<Vec<Value>> {
             }
         }
         let expiry = record["expires"].as_str().ok_or("missing expiry")?;
-        if expiry.len() != 10
-            || expiry <= today.as_str()
+        if !super::policy::unexpired(expiry, &today)
             || record["reason"]
                 .as_str()
                 .is_none_or(|reason| reason.len() < 30)
