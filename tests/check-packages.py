@@ -32,6 +32,7 @@ cases = []
 # This inventory predates the directory reorganization. Files may move, public
 # references must keep resolving to the same package/version/platform contract.
 legacy_references = [
+    ("versioned_k3s_1_37_1_gnu", "k3s-1.37.1+k3s1-binary-linux-x86_64-gnu-"),
     ("bootstrap", "bootstrap-glibc"),
     ("glibc", "glibc"),
     ("hello", "hello"),
@@ -50,6 +51,8 @@ for name, identity in legacy_references:
     cases.append((f"pkgs::{name}", identity, None))
 
 for expression, identity in [
+    ('package_recipe(packages.k3s { version = "1.37.1+k3s1"; })', "k3s-1.37.1+k3s1-binary-linux-x86_64-gnu-"),
+    ('package_recipe(pkgs.k3s { version = "1.37.1+k3s1"; })', "k3s-1.37.1+k3s1-binary-linux-x86_64-gnu-"),
     ('packages.glibc { version = "2.44"; }', "glibc-2.44-linux-x86_64-gnu"),
     ('pkgs.glibc_version { version = "2.44"; }', "glibc-2.44-linux-x86_64-gnu"),
     ('packages.managed_glibc({ version = "2.44"; }, seed)', "glibc-managed-2.44-linux-x86_64-gnu"),
@@ -63,6 +66,8 @@ for expression, identity in [
 ]:
     cases.append((expression, identity, None))
 for expression in [
+    'package_recipe(packages.k3s { version = "1.37.0+k3s1"; })',
+    'package_recipe(pkgs.forSystem("linux-x86_64-musl").k3s { version = "1.37.1+k3s1"; })',
     'packages.glibc { version = "2.4"; }',
     'packages.glibc { version = "2.45"; }',
     'packages.zlib({ version = "1.3"; }, seed, libc)',

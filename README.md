@@ -185,9 +185,9 @@ services.k3s = {
     settings = {
         nodeName = "notebook-test";
         nodeIp = "192.168.1.50";
-        clusterInit = Some(true);
-        tokenFile = Some("/etc/rancher/k3s/token");
-        disable = Some(["traefik", "servicelb", "metrics-server"]);
+        clusterInit = Option::Some(true);
+        tokenFile = Option::Some("/etc/rancher/k3s/token");
+        disable = Option::Some(["traefik", "servicelb", "metrics-server"]);
     };
 };
 ```
