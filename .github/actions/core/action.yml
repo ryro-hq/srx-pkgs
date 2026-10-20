@@ -54,7 +54,7 @@ runs:
         mkdir -p target/catalog-candidate
         cp target/x86_64-unknown-linux-gnu/release/{srx,syrox-worker} target/catalog-candidate/
         RUSTFLAGS='' cargo run --locked -p syrox-engine --example ci_candidates -- "$PWD/target/catalog-candidate" x86_64-unknown-linux-gnu
-        cargo test --locked -p syrox --test vm --no-run --message-format json > target/catalog-harness.jsonl
+        RUSTFLAGS='' cargo test --locked -p syrox --test vm --no-run --message-format json > target/catalog-harness.jsonl
         jq -rs '[.[] | select(.reason == "compiler-artifact" and .target.name == "vm" and .executable != null)][-1].executable' target/catalog-harness.jsonl > target/catalog-harness.path
         cp "$(cat target/catalog-harness.path)" target/catalog-candidate/catalog-harness
     - if: inputs.build == 'true'
