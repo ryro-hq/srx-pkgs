@@ -22,18 +22,23 @@ CodeQL was removed by explicit maintainer decision; its gate, triage and excepti
 records are not part of the final implementation.
 
 The [catalog run before the final core pin](https://github.com/ryro-hq/srx-pkgs/actions/runs/39485797014)
-passed both environment builds and eleven of twelve qualification cases. The
-Debian Hello GNU case hit a temporary DNS resolution failure and is being repeated
-with its dependent gates. The final core pin and renewed lock must pass their own
-complete qualification; these earlier cases do not qualify a changed head.
+passed both environment builds, all twelve qualification cases and both manifests,
+after repeating the Debian Hello GNU case following a temporary DNS failure.
+Release preflight found a redundant glibc license symlink and then blocked on
+glibc vulnerability matches. The [glibc assessment](glibc.md) records the upstream
+security backport, regression and exact expiring OpenVEX scope. The final core pin,
+patched GNU runtime and renewed lock must pass their own complete qualification;
+the earlier cases do not qualify a changed head.
 Final catalog aggregate and trusted publication are still pending. The portable
 catalog suite passes locally against the merged core. No local KVM is available,
 and no K3s cluster was started.
 
-Both main rules now require transitional `success` and CNCF DCO2 `DCO`, with
-rebase-only linear integration and one-PR ALLGREEN queues (360 minutes, no bypass).
-DCO2 also passed the core merge-group check. Replace required `success` with
-`verify` after each default-branch workflow succeeds. Release attestation/offline
+The [core main run](https://github.com/ryro-hq/srx/actions/runs/39491356644) passed
+every gate; its rules now require `verify` and CNCF DCO2 `DCO`. Catalog main rules
+still require transitional `success` and `DCO`. Both use rebase-only linear
+integration and one-PR ALLGREEN queues (360 minutes, no bypass). DCO2 also passed
+the core merge-group check. Replace catalog required `success` with `verify`
+after its default-branch workflow succeeds. Release attestation/offline
 verification must be checked on actual publication before any release-assurance
 claim. The initial GitHub settings snapshot predates this rules transition;
 this document records the subsequent rollout.

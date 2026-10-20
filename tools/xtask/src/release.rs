@@ -4,6 +4,11 @@ use serde_json::{Value, json};
 use sha2::{Digest as _, Sha256};
 use std::fmt::Write as _;
 use std::{collections::BTreeSet, fs, io::Read as _, path::Path, process::Command};
+mod vex;
+
+pub(super) fn check_vex_review() -> Result {
+    vex::check_review()
+}
 
 fn output(program: &str, args: &[&str]) -> Result<String> {
     let result = Command::new(program).args(args).output()?;
@@ -275,7 +280,10 @@ fn upstream(directory: &Path, policy: &Value, index: usize) -> Result<Value> {
             || result.stdout.is_empty()
             || result.stdout.len() > 4 * 1024 * 1024
         {
-            return Err("upstream license missing from pinned archive".into());
+            return Err(format!(
+                "upstream license {path} missing, empty or oversized in pinned archive"
+            )
+            .into());
         }
         fs::write(legal.join(file), result.stdout)?;
     }
@@ -288,6 +296,33 @@ fn upstream(directory: &Path, policy: &Value, index: usize) -> Result<Value> {
         &text(policy, "purl")?,
     );
     result["checksums"] = json!([{"algorithm":"SHA256","checksumValue":pin}]);
+    if let Some(patches) = policy.get("patches") {
+        for patch in patches
+            .as_array()
+            .ok_or("invalid upstream patch inventory")?
+        {
+            let path = text(patch, "path")?;
+            if !vex::safe_path(&path) || !path.starts_with("assets/") {
+                return Err("unsafe upstream patch path".into());
+            }
+            let source = Path::new(&path);
+            if fs::symlink_metadata(source)?.len() > 1024 * 1024
+                || patch["sha256"] != digest(source)?
+            {
+                return Err("upstream patch differs from reviewed bytes".into());
+            }
+            let filename = source
+                .file_name()
+                .ok_or("missing upstream patch filename")?;
+            fs::copy(
+                source,
+                sources.join(format!("{name}-{version}-{}", filename.to_string_lossy())),
+            )?;
+        }
+        result["sourceInfo"] = json!(
+            "Upstream archive plus exact reviewed patches retained under sources/; see vex-policy.json for catalog and source bindings."
+        );
+    }
     if let Some(cpe) = policy["cpe"].as_str() {
         result["externalRefs"].as_array_mut().ok_or("invalid SPDX references")?.push(json!({"referenceCategory":"SECURITY","referenceType":"cpe23Type","referenceLocator":cpe}));
     }
@@ -347,8 +382,11 @@ fn scan(directory: &Path) -> Result {
     let sbom = directory.join("sbom.spdx.json");
     validate_sbom(&read(&sbom)?)?;
     let report = directory.join("grype.json");
+    let assessment = vex::prepare(directory)?;
     let status = Command::new("grype")
         .arg(format!("sbom:{}", sbom.display()))
+        .arg("--vex")
+        .arg(&assessment.document)
         .args(["--fail-on", "high", "--output", "json", "--file"])
         .arg(&report)
         .status()?;
@@ -358,7 +396,9 @@ fn scan(directory: &Path) -> Result {
                 .into(),
         );
     }
-    validate_scan(&read(&report)?)?;
+    let report = read(&report)?;
+    validate_scan(&report)?;
+    vex::validate_ignored(&report, Some(&assessment))?;
     checksums(directory)
 }
 fn validate_scan(report: &Value) -> Result {

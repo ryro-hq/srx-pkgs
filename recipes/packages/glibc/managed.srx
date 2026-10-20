@@ -19,8 +19,11 @@ fn program(options: BuildOptions) -> Build {
         resources = BuildResources::Large;
         source_format = BuildSourceFormat::Xz;
         produces = ["dev", "out"];
-        steps = [
-            BuildStep::Extract(BuildPath::Work("source")),
+        steps = [BuildStep::Extract(BuildPath::Work("source"))] ++ patches::apply(
+            options.source_directory,
+            lib::toolchain::tools("usr/bin/patch"),
+            environment(target_compiler())
+        ) ++ [
             // The pinned source calls this script directly from Makerules and posix/Makefile.
             BuildStep::ReplaceShebang(
                 BuildPath::Work("source/${options.source_directory}/scripts/mkinstalldirs"),
@@ -57,6 +60,18 @@ fn program(options: BuildOptions) -> Build {
                 lib::toolchain::tools("usr/bin/make"),
                 cwd,
                 [build_text("-j2"), make_shell(), make_cc(), make_build_cc()],
+                environment(target_compiler())
+            ),
+            builders::process::run(
+                lib::toolchain::tools("usr/bin/make"),
+                cwd,
+                [
+                    build_text("test"),
+                    build_text("t=stdlib/tst-strfmon-bug34510"),
+                    make_shell(),
+                    make_cc(),
+                    make_build_cc()
+                ],
                 environment(target_compiler())
             ),
             builders::process::run(

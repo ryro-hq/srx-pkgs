@@ -45,14 +45,21 @@
       "recipe_source": "recipes/packages/glibc/releases.srx",
       "url": "https://ftp.gnu.org/gnu/glibc/glibc-2.44.tar.xz",
       "sha256": "37f600f2bef3c5e8300147059568b2a2e40a7ad6ccc65ce942556d49429cc667",
-      "purl": "pkg:generic/glibc@2.44",
+      "purl": "pkg:generic/glibc@2.44?patches=0eee10d275c28263a17fb5639977a71f7b0807e264f214da8ebe9ecaa9ddb429",
       "cpe": "cpe:2.3:a:gnu:glibc:2.44:*:*:*:*:*:*:*",
       "license_files": [
-        "COPYING.LIB",
         "COPYING.LESSERv2",
         "COPYINGv2",
         "COPYINGv3",
         "LICENSES"
+      ],
+      "patches": [
+        {
+          "path": "assets/glibc/CVE-2026-19499.patch",
+          "sha256": "d02811ff0ae63d1bd0bfe5be00c1e6788417b1bd17504dbfa11635ca5cf9f856",
+          "upstream_commit": "b090cf226ff65b913e41536f1f573f500855615c",
+          "url": "https://sourceware.org/git/?p=glibc.git;a=patch;h=b090cf226ff65b913e41536f1f573f500855615c"
+        }
       ]
     }
   ]

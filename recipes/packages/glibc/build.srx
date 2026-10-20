@@ -17,8 +17,11 @@ fn build(options: BuildOptions) -> Build {
         resources = BuildResources::Large;
         source_format = BuildSourceFormat::Xz;
         produces = ["dev", "out"];
-        steps = [
-            BuildStep::Extract(BuildPath::Work("source")),
+        steps = [BuildStep::Extract(BuildPath::Work("source"))] ++ patches::apply(
+            options.source_directory,
+            BuildPath::Host("/usr/bin/patch"),
+            []
+        ) ++ [
             BuildStep::Directory(cwd),
             builders::process::run(
                 BuildPath::Host("/bin/sh"),
@@ -40,6 +43,12 @@ fn build(options: BuildOptions) -> Build {
                 BuildPath::Host("/usr/bin/make"),
                 cwd,
                 [build_text("-j2")],
+                [builders::process::env("AWK", build_path(BuildPath::Host("/usr/bin/gawk")))]
+            ),
+            builders::process::run(
+                BuildPath::Host("/usr/bin/make"),
+                cwd,
+                [build_text("test"), build_text("t=stdlib/tst-strfmon-bug34510")],
                 [builders::process::env("AWK", build_path(BuildPath::Host("/usr/bin/gawk")))]
             ),
             builders::process::run(
