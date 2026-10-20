@@ -11,7 +11,6 @@ mod policy;
 mod projections;
 mod qualification;
 mod release;
-mod sarif;
 type Result<T = ()> = std::result::Result<T, Box<dyn Error>>;
 
 fn root() -> PathBuf {
@@ -110,7 +109,6 @@ fn execute() -> Result {
         ["test", "--suite", name] => suite(name),
         ["examples", "k3s", "--output", destination] => examples::prepare(Path::new(destination)),
         ["qualification", command, rest @ ..] => qualification::execute(command, rest),
-        ["security", "sarif", directory, language] => sarif::check(Path::new(directory), language),
         ["security", "exceptions"] => policy::exceptions(),
         ["security", "workflows"] => policy::workflows(),
         ["security", "tools", "--output", directory] => policy::tools(Path::new(directory), "all"),
@@ -120,7 +118,7 @@ fn execute() -> Result {
         ["release", "catalog", directory] => release::catalog(Path::new(directory)),
         ["release", "checksums", directory] => release::checksums(Path::new(directory)),
         ["security", "audit"] => run("cargo", &["deny", "--locked", "check"]),
-        _ => Err("use cargo xtask check | fmt | test --suite all|projections|authoring|examples | examples k3s --output PATH | qualification matrix|record|verify ... | security audit|sarif ...".into()),
+        _ => Err("use cargo xtask check | fmt | test --suite all|projections|authoring|examples | examples k3s --output PATH | qualification matrix|record|verify ... | security audit|exceptions|workflows ...".into()),
     }
 }
 fn main() -> ExitCode {
