@@ -150,6 +150,7 @@ pub(super) fn exceptions() -> Result {
         }
     }
     println!("{} scoped policy exceptions are unexpired", records.len());
+    crate::release::check_vex_review()?;
     Ok(())
 }
 

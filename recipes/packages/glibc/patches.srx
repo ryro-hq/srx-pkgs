@@ -1,0 +1,24 @@
+// Upstream b090cf226ff65b913e41536f1f573f500855615c; retain the original patch.
+pub fn apply(source_directory: SourceDirectory, executable: BuildPath, environment: [BuildEnv]) -> [BuildStep] {
+    let patch = BuildPath::Work("CVE-2026-19499.patch");
+    let contents = std::files::read_text("assets/glibc/CVE-2026-19499.patch");
+    [
+        BuildStep::Write(BuildFile {
+                path = patch;
+                text = build_text("${contents}");
+            }),
+        builders::process::run(
+            executable,
+            BuildPath::Work("source/${source_directory}"),
+            [
+                build_text("--batch"),
+                build_text("--forward"),
+                build_text("--fuzz=0"),
+                build_text("-p1"),
+                build_text("-i"),
+                build_path(patch)
+            ],
+            environment
+        )
+    ]
+}

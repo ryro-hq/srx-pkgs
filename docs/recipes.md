@@ -65,6 +65,8 @@ Managed factories require a `Toolchain` with the refined
 runtime (2), sysroot (3) and tools (4). libc, zlib and Git's static shell/pager are
 additional explicit inputs. The contract checks layout compatibility, while receipts
 and admitted manifests authenticate actual bytes. No implicit host fallback exists.
+Managed glibc also requires `usr/bin/patch` in the tools output to apply its
+authenticated upstream security backport before configuration.
 
 ## Qualification
 

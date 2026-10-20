@@ -1,0 +1,60 @@
+{
+  "@context": "https://openvex.dev/ns/v0.2.0",
+  "@id": "https://github.com/ryro-hq/srx-pkgs/blob/main/security/vex/glibc-2.44.openvex.json",
+  "author": "ryro-hq/srx-pkgs",
+  "timestamp": "2026-10-20T20:53:59Z",
+  "version": 1,
+  "statements": [
+    {
+      "vulnerability": {
+        "name": "CVE-2019-1010022"
+      },
+      "products": [
+        {
+          "@id": "pkg:generic/glibc@2.44?patches=0eee10d275c28263a17fb5639977a71f7b0807e264f214da8ebe9ecaa9ddb429"
+        }
+      ],
+      "status": "not_affected",
+      "status_notes": "Upstream treats this report as a non-security bug outside stack-canary guarantees: https://sourceware.org/bugzilla/show_bug.cgi?id=22850#c3",
+      "impact_statement": "Upstream treats this report as a non-security bug outside stack-canary guarantees: https://sourceware.org/bugzilla/show_bug.cgi?id=22850#c3"
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2019-1010023"
+      },
+      "products": [
+        {
+          "@id": "pkg:generic/glibc@2.44?patches=0eee10d275c28263a17fb5639977a71f7b0807e264f214da8ebe9ecaa9ddb429"
+        }
+      ],
+      "status": "not_affected",
+      "status_notes": "Upstream treats executing untrusted ELF code through ldd as outside supported security guarantees: https://sourceware.org/bugzilla/show_bug.cgi?id=22851",
+      "impact_statement": "Upstream treats executing untrusted ELF code through ldd as outside supported security guarantees: https://sourceware.org/bugzilla/show_bug.cgi?id=22851"
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-0861"
+      },
+      "products": [
+        {
+          "@id": "pkg:generic/glibc@2.44?patches=0eee10d275c28263a17fb5639977a71f7b0807e264f214da8ebe9ecaa9ddb429"
+        }
+      ],
+      "status": "fixed",
+      "status_notes": "The upstream fix c9188d333717d3ceb7e3020011651f424f749f93 shipped in glibc 2.43 and is included in 2.44: https://sourceware.org/pipermail/libc-announce/2026/000049.html"
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-19499"
+      },
+      "products": [
+        {
+          "@id": "pkg:generic/glibc@2.44?patches=0eee10d275c28263a17fb5639977a71f7b0807e264f214da8ebe9ecaa9ddb429"
+        }
+      ],
+      "status": "fixed",
+      "status_notes": "The exact upstream fix b090cf226ff65b913e41536f1f573f500855615c is applied with zero fuzz in both glibc build profiles. GNU qualification builds run its tst-strfmon-bug34510 regression before installation. The patch bytes, recipe inputs and source archive are bound by the catalog lock and VEX policy."
+    }
+  ],
+  "role": "Document Creator"
+}

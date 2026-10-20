@@ -1,0 +1,50 @@
+{
+  "schema": 1,
+  "expires": "2026-11-20",
+  "document": "security/vex/glibc-2.44.openvex.json",
+  "document_sha256": "7a4a80a23e3d5b91334c7c3116a90736f0f768d5c8241a938d84ab9afe0c9693",
+  "catalog_lock_sha256": "b89d3b3d8b21483a1e704bc198dbfeb23e0069b049f33c10ea2bc6393042f5f4",
+  "source_sha256": "37f600f2bef3c5e8300147059568b2a2e40a7ad6ccc65ce942556d49429cc667",
+  "purl": "pkg:generic/glibc@2.44?patches=0eee10d275c28263a17fb5639977a71f7b0807e264f214da8ebe9ecaa9ddb429",
+  "patches": [
+    {
+      "path": "assets/glibc/CVE-2026-19499.patch",
+      "sha256": "d02811ff0ae63d1bd0bfe5be00c1e6788417b1bd17504dbfa11635ca5cf9f856",
+      "upstream_commit": "b090cf226ff65b913e41536f1f573f500855615c",
+      "url": "https://sourceware.org/git/?p=glibc.git;a=patch;h=b090cf226ff65b913e41536f1f573f500855615c"
+    }
+  ],
+  "assessments": [
+    {
+      "id": "CVE-2019-1010022",
+      "status": "not_affected",
+      "evidence": [
+        "https://sourceware.org/bugzilla/show_bug.cgi?id=22850#c3",
+        "https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2019-1010022"
+      ]
+    },
+    {
+      "id": "CVE-2019-1010023",
+      "status": "not_affected",
+      "evidence": [
+        "https://sourceware.org/bugzilla/show_bug.cgi?id=22851",
+        "https://security-tracker.debian.org/tracker/CVE-2019-1010023"
+      ]
+    },
+    {
+      "id": "CVE-2026-0861",
+      "status": "fixed",
+      "evidence": [
+        "https://sourceware.org/pipermail/libc-announce/2026/000049.html"
+      ]
+    },
+    {
+      "id": "CVE-2026-19499",
+      "status": "fixed",
+      "evidence": [
+        "https://sourceware.org/git/?p=glibc.git;a=patch;h=b090cf226ff65b913e41536f1f573f500855615c",
+        "https://www.openwall.com/lists/oss-security/2026/09/14/31"
+      ]
+    }
+  ]
+}

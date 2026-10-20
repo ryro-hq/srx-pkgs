@@ -52,8 +52,10 @@ See [authoring](docs/recipes.md), [testing](docs/testing.md),
 | `recipes/packages/` | Package selectors, source data, construction, contracts and integrations |
 | `recipes/lib/` | Shared platform and managed-toolchain selection |
 | `recipes/builders/` | Typed recipe, process, configured-package and autotools construction |
+| `assets/` | Authenticated upstream patch bytes used by recipes |
 | `scaffolds/` | `.srx.in` authoring templates, outside the module loader |
 | `qualification/` | Typed package command/configuration/HTTP checks and fixtures |
+| `security/` | Pinned tools, source/license policy and scoped vulnerability assessments |
 | `tests/fixtures/` | Projection and negative cases, outside the module loader |
 | `tools/xtask/` | Rust maintenance entry point |
 | `examples/k3s/` | Explicitly prepared configuration examples |

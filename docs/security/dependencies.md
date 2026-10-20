@@ -21,6 +21,9 @@ Rust tooling's permissive license allowlist does not determine the licenses of
 GNU programs or distributed package outputs. Catalog releases need package license
 files, exact upstream and patch pins, an SPDX SBOM and a Grype vulnerability report.
 A package with uncertain license or vulnerability applicability cannot be published.
+The [glibc assessment](glibc.md) records the upstream security backport and exact,
+expiring OpenVEX scope. Audits reject changed source/patch/catalog bindings, and
+release preflight rejects scanner suppressions outside that scope.
 
 The catalog updater is prepared and disabled by maintainer choice. Activation later
 requires an App installed only in this repository with Contents and Pull requests
