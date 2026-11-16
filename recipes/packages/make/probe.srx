@@ -1,0 +1,65 @@
+// An explicit source-built make -> assembler -> linker dependency chain.
+pub fn managed_make_binutils_probe(make: OutputRef<Recipe>, binutils: OutputRef<Recipe>) -> RecipeRef<Recipe> {
+    recipe_ref(fn() -> Recipe {
+            builders::recipe::from_source({
+                    id = "make-binutils-managed-probe-x86_64";
+                    source = support::Source {
+                        version = "1";
+                        url = "project:assets/make-binutils-probe.mk";
+                        sha256 = "bf78ee297a410832bc342260a07f6d1fdacdcb485f656c748764cf8cd8ade1fc";
+                        maximum_bytes = 4096;
+                    };
+                    build_inputs = builders::recipe::selected_inputs([make, binutils]);
+                    build = program();
+                    commands = [Command {
+                            name = "probe";
+                            output = "out";
+                            path = "usr/bin/make-binutils-probe";
+                        }];
+                })
+        })
+}
+fn program() -> Build {
+    let cwd = BuildPath::Work("build");
+    Build {
+        profile = BuildProfile::Managed;
+        resources = BuildResources::Standard;
+        source_format = BuildSourceFormat::Raw;
+        source_directory = "make-binutils-probe";
+        timeout_seconds = 30;
+        steps = [
+            BuildStep::Directory(cwd),
+            builders::process::run(
+                BuildPath::Input(0, "usr/bin/make"),
+                cwd,
+                [
+                    build_text("-rR"),
+                    build_text("-j2"),
+                    build_text("--no-print-directory"),
+                    build_text("-f"),
+                    build_path(BuildPath::Source),
+                    builders::process::argument(
+                        "AS=",
+                        BuildPath::Input(1, "usr/bin/x86_64-srx-linux-gnu-as")
+                    ),
+                    builders::process::argument(
+                        "LD=",
+                        BuildPath::Input(1, "usr/bin/x86_64-srx-linux-gnu-ld")
+                    )
+                ],
+                []
+            ),
+            builders::process::run(BuildPath::Work("build/probe"), cwd, [], []),
+            BuildStep::Directory(BuildPath::Output("out", "usr/bin")),
+            BuildStep::Copy(
+                BuildPath::Work("build/probe"),
+                BuildPath::Output("out", "usr/bin/make-binutils-probe")
+            ),
+            BuildStep::Directory(BuildPath::Output("out", "usr/share/licenses/make-binutils-probe")),
+            BuildStep::Copy(
+                BuildPath::Source,
+                BuildPath::Output("out", "usr/share/licenses/make-binutils-probe/source.mk")
+            )
+        ];
+    }
+}

@@ -1,0 +1,66 @@
+// Verify consumption of a declared source-built assembler/linker without /usr.
+pub fn managed_binutils_probe(tools: OutputRef<Recipe>) -> RecipeRef<Recipe> {
+    recipe_ref(fn() -> Recipe {
+            builders::recipe::from_source({
+                    id = "binutils-managed-probe-x86_64";
+                    source = support::Source {
+                        version = "1";
+                        url = "project:assets/binutils-probe-x86_64.s";
+                        sha256 = "72484eadade977eb301a4d7e893dca5f4861507c46b6e418c77edd33d2ddcab7";
+                        maximum_bytes = 4096;
+                    };
+                    build_inputs = builders::recipe::selected_inputs([tools]);
+                    build = program();
+                    commands = [Command {
+                            name = "probe";
+                            output = "out";
+                            path = "usr/bin/binutils-probe";
+                        }];
+                })
+        })
+}
+fn program() -> Build {
+    let cwd = BuildPath::Work("build");
+    Build {
+        profile = BuildProfile::Managed;
+        resources = BuildResources::Standard;
+        source_format = BuildSourceFormat::Raw;
+        source_directory = "binutils-probe";
+        timeout_seconds = 30;
+        steps = [
+            BuildStep::Directory(cwd),
+            BuildStep::Directory(BuildPath::Output("out", "usr/bin")),
+            builders::process::run(
+                BuildPath::Input(0, "usr/bin/x86_64-srx-linux-gnu-as"),
+                cwd,
+                [
+                    build_text("--64"),
+                    build_text("-o"),
+                    build_text("probe.o"),
+                    build_path(BuildPath::Source)
+                ],
+                []
+            ),
+            builders::process::run(
+                BuildPath::Input(0, "usr/bin/x86_64-srx-linux-gnu-ld"),
+                cwd,
+                [
+                    build_text("-static"),
+                    build_text("--build-id=none"),
+                    build_text("-e"),
+                    build_text("_start"),
+                    build_text("-o"),
+                    build_path(BuildPath::Output("out", "usr/bin/binutils-probe")),
+                    build_text("probe.o")
+                ],
+                []
+            ),
+            builders::process::run(BuildPath::Output("out", "usr/bin/binutils-probe"), cwd, [], []),
+            BuildStep::Directory(BuildPath::Output("out", "usr/share/licenses/binutils-probe")),
+            BuildStep::Copy(
+                BuildPath::Source,
+                BuildPath::Output("out", "usr/share/licenses/binutils-probe/source.s")
+            )
+        ];
+    }
+}

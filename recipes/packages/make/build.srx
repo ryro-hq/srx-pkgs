@@ -1,0 +1,81 @@
+pub fn bootstrap(source: support::Source) -> Recipe {
+    builders::recipe::from_source({
+            id = "make-bootstrap";
+            source = source;
+            build = program(source.version);
+            commands = [Command {
+                    name = "make";
+                    output = "out";
+                    path = "usr/bin/make";
+                }];
+        })
+}
+fn program(version: PackagePinText) -> Build {
+    let cwd = BuildPath::Work("build");
+    let environment = [
+        builders::process::env("CC", build_path(BuildPath::Host("/usr/bin/gcc"))),
+        builders::process::env("CFLAGS", build_text("-O2 -g0")),
+        builders::process::env("LDFLAGS", build_text("-static")),
+        builders::process::env("PKG_CONFIG", build_path(BuildPath::Host("/usr/bin/false")))
+    ];
+    Build {
+        profile = BuildProfile::HostBootstrap;
+        resources = BuildResources::Standard;
+        source_format = BuildSourceFormat::Gzip;
+        source_directory = "make-${version}";
+        timeout_seconds = 600;
+        steps = [
+            BuildStep::Extract(BuildPath::Work("source")),
+            BuildStep::Directory(cwd),
+            builders::process::run(
+                BuildPath::Host("/bin/sh"),
+                cwd,
+                [
+                    build_path(BuildPath::Work("source/make-${version}/configure")),
+                    builders::process::argument("--prefix=", BuildPath::Installed("out", "usr")),
+                    build_text("--disable-nls"),
+                    build_text("--without-guile"),
+                    build_text("--disable-load"),
+                    build_text("--disable-posix-spawn")
+                ],
+                environment
+            ),
+            builders::process::run(
+                BuildPath::Host("/usr/bin/make"),
+                cwd,
+                [
+                    build_text("-j2"),
+                    builders::process::argument("MAKEINFO=", BuildPath::Host("/usr/bin/true"))
+                ],
+                environment
+            ),
+            BuildStep::Write(BuildFile {
+                    path = BuildPath::Work("build/probe.mk");
+                    text = build_text(".PHONY: all\nall:\n\t$(file >probe-result,SRX source-built make)\n");
+                }),
+            BuildStep::Write(BuildFile {
+                    path = BuildPath::Work("build/expected");
+                    text = build_text("SRX source-built make\n");
+                }),
+            builders::process::run(
+                BuildPath::Work("build/make"),
+                cwd,
+                [build_text("-rR"), build_text("-f"), build_text("probe.mk")],
+                []
+            ),
+            builders::process::run(
+                BuildPath::Host("/usr/bin/cmp"),
+                cwd,
+                [build_text("probe-result"), build_text("expected")],
+                []
+            ),
+            BuildStep::Directory(BuildPath::Output("out", "usr/bin")),
+            BuildStep::Copy(BuildPath::Work("build/make"), BuildPath::Output("out", "usr/bin/make")),
+            BuildStep::Directory(BuildPath::Output("out", "usr/share/licenses/make")),
+            BuildStep::Copy(
+                BuildPath::Work("source/make-${version}/COPYING"),
+                BuildPath::Output("out", "usr/share/licenses/make/COPYING")
+            )
+        ];
+    }
+}

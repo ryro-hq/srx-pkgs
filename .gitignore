@@ -5,3 +5,4 @@
 /.release/
 /target/
 /build.toml
+__pycache__/

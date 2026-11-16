@@ -15,7 +15,26 @@ pub use catalog::packages::git::{
 pub use catalog::packages::zlib::{
     zlib
 };
+pub use catalog::packages::e2fsprogs::e2fsprogs_bootstrap;
+pub type E2fsprogsBootstrapSelection = catalog::packages::e2fsprogs::Selection;
+pub let bootstrap_e2fsprogs_1_47_4_gnu = e2fsprogs_bootstrap({});
+pub use catalog::packages::binutils::binutils_bootstrap;
+pub type BinutilsBootstrapSelection = catalog::packages::binutils::Selection;
+pub let bootstrap_binutils_2_47_gnu = binutils_bootstrap({});
+pub use catalog::packages::binutils::probe::managed_binutils_probe;
+pub let source_built_binutils_probe = managed_binutils_probe(recipe_output(
+        bootstrap_binutils_2_47_gnu,
+        "out"
+    ));
 pub use catalog::packages::git::service::git_service;
+pub use catalog::packages::make::make_bootstrap;
+pub type MakeBootstrapSelection = catalog::packages::make::Selection;
+pub let bootstrap_make_4_4_1_gnu = make_bootstrap({});
+pub use catalog::packages::make::probe::managed_make_binutils_probe;
+pub let source_built_make_binutils_probe = managed_make_binutils_probe(
+    recipe_output(bootstrap_make_4_4_1_gnu, "out"),
+    recipe_output(bootstrap_binutils_2_47_gnu, "out")
+);
 pub use catalog::packages::nginx::integration::{
     nginx_service,
     nginx_settings,

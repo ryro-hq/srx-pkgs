@@ -1,0 +1,11 @@
+// Historical GNU release. See the contract's signing-subkey expiry record.
+pub fn source(const version: PackagePinText) -> support::Source {
+    match version {
+        "4.4.1" => support::Source {
+            version = "4.4.1";
+            url = "https://ftp.gnu.org/gnu/make/make-4.4.1.tar.gz";
+            sha256 = "dd16fb1d67bfab79a72f5e8390735c49e3e8e70b4945a15ab1f81ddb78658fb3";
+            maximum_bytes = 4194304;
+        }
+    }
+}
