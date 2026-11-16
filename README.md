@@ -94,6 +94,23 @@ also have exact selectors with explicit managed providers; their managed builds
 remain experimental. Their source tables are hand-maintained until those
 combinations have native qualification and can enter `catalog.toml`.
 
+The experimental [`e2fsprogs_bootstrap`](docs/contracts/e2fsprogs-bootstrap.md)
+factory builds static ext4 tools from pinned 1.47.4 sources using an explicitly
+selected host toolchain. It is a builder bootstrap input awaiting native
+qualification and grants no authority to format or mount storage.
+
+The experimental [`binutils_bootstrap`](docs/contracts/binutils-bootstrap.md)
+factory builds the pinned 2.47 assembler, linker and binary utilities for
+`x86_64-srx-linux-gnu`. It uses the explicit host seed and requires a generated
+assembly/archive/link/run smoke test before output collection. A source-built
+compiler, target sysroot and complete managed bootstrap remain pending.
+
+The experimental [`make_bootstrap`](docs/contracts/make-bootstrap.md) builds
+static GNU make 4.4.1. A Managed probe has consumed it together with the
+source-built binutils, generated assembly and run the linked executable without
+a host-toolchain mount. The historical signature reports `EXPKEYSIG`; its
+temporal admission remains an open publication issue outside the qualified matrix.
+
 Run the maintenance commands from this catalog checkout, using `srx` built from
 the commit in `.syrox-core`. The example assumes a matching clean core checkout
 at `../syrox`; adjust that sibling path for your local layout. Exporting its

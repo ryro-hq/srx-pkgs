@@ -1,0 +1,19 @@
+// Exact bootstrap tool; a complete managed compiler/sysroot is separate.
+pub struct Selection {
+    version: PackagePinText = "4.4.1";
+    system: PackagePinText = "";
+    libc: PackagePinText = "";
+}
+pub fn make_bootstrap(const selection: Selection) -> RecipeRef<Recipe> {
+    let source = releases::source(selection.version);
+    let system = lib::platform::gnu_x86_64({
+            system = selection.system;
+            libc = selection.libc;
+        });
+    recipe_ref(fn() -> Recipe {
+            templates::recipe::named_recipe(
+                build::bootstrap(source),
+                "make-bootstrap-${source.version}-${system}"
+            )
+        })
+}

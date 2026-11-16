@@ -49,7 +49,7 @@ class ConfiguredTemplate(unittest.TestCase):
                 FIXTURE.replace("RENDER", renderer).replace("INTEGRATE", integration))
             result = '''inputs { catalog = "modules:recipes"; }
                 let selected = catalog::fixture::selected();
-                outputs { os: Os = Os { pkgs = []; services = SERVICES; }; }'''
+                outputs { os: Services = Services { pkgs = []; services = SERVICES; }; }'''
             services = ('[package_service(selected, "hello", True, "web")]' if service else
                         '[Service { id = "web"; files = [ConfigFile { path = "config"; '
                         'text = package_config(selected, "hello"); }]; }]')

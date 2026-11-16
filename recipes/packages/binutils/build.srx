@@ -1,0 +1,208 @@
+pub fn bootstrap(source: support::Source) -> Recipe {
+    templates::recipe::from_source({
+            id = "binutils-bootstrap";
+            source = source;
+            build = program(source.version);
+            commands = [
+                command("as"),
+                command("ld"),
+                command("ar"),
+                command("nm"),
+                command("ranlib"),
+                command("objcopy"),
+                command("objdump"),
+                command("readelf"),
+                command("strip")
+            ];
+        })
+}
+fn command(name: CommandName) -> Command {
+    Command {
+        name = name;
+        output = "out";
+        path = "usr/bin/x86_64-srx-linux-gnu-${name}";
+    }
+}
+fn install(source: BuildRelativePath, name: CommandName) -> BuildStep {
+    BuildStep::Copy(
+        BuildPath::Work("build/${source}"),
+        BuildPath::Output("out", "usr/bin/x86_64-srx-linux-gnu-${name}")
+    )
+}
+fn program(version: PackagePinText) -> Build {
+    let cwd = BuildPath::Work("build");
+    let environment = [
+        templates::process::env("CC", build_path(BuildPath::Host("/usr/bin/gcc"))),
+        templates::process::env("CXX", build_path(BuildPath::Host("/usr/bin/g++"))),
+        templates::process::env("CFLAGS", build_text("-O2 -g0")),
+        templates::process::env("CXXFLAGS", build_text("-O2 -g0")),
+        templates::process::env("LDFLAGS", build_text("-static")),
+        templates::process::env("PKG_CONFIG", build_path(BuildPath::Host("/usr/bin/false")))
+    ];
+    Build {
+        profile = BuildProfile::HostBootstrap;
+        resources = BuildResources::Large;
+        source_format = BuildSourceFormat::Xz;
+        source_directory = "binutils-${version}";
+        timeout_seconds = 1800;
+        steps = [
+            BuildStep::Extract(BuildPath::Work("source")),
+            BuildStep::Directory(cwd),
+            BuildStep::Directory(BuildPath::Output("out", "usr/x86_64-srx-linux-gnu/sysroot")),
+            templates::process::run(
+                BuildPath::Host("/bin/sh"),
+                cwd,
+                [
+                    build_path(BuildPath::Work("source/binutils-${version}/configure")),
+                    templates::process::argument("--prefix=", BuildPath::Installed("out", "usr")),
+                    templates::process::argument(
+                        "--with-sysroot=",
+                        BuildPath::Installed("out", "usr/x86_64-srx-linux-gnu/sysroot")
+                    ),
+                    build_text("--target=x86_64-srx-linux-gnu"),
+                    build_text("--disable-nls"),
+                    build_text("--disable-shared"),
+                    build_text("--enable-static"),
+                    build_text("--disable-plugins"),
+                    build_text("--disable-libctf"),
+                    build_text("--disable-gprofng"),
+                    build_text("--disable-gprof"),
+                    build_text("--disable-gdb"),
+                    build_text("--disable-gdbserver"),
+                    build_text("--disable-werror"),
+                    build_text("--enable-deterministic-archives"),
+                    build_text("--without-system-zlib"),
+                    build_text("--without-zstd"),
+                    build_text("--without-debuginfod"),
+                    build_text("--without-msgpack")
+                ],
+                environment
+            ),
+            templates::process::run(
+                BuildPath::Host("/usr/bin/make"),
+                cwd,
+                [
+                    build_text("-j2"),
+                    build_text("all-gas"),
+                    build_text("all-ld"),
+                    build_text("all-binutils"),
+                    // Libtool's -static alone still permits a dynamic libc.
+                    build_text("AM_LDFLAGS=-all-static"),
+                    templates::process::argument("MAKEINFO=", BuildPath::Host("/usr/bin/true")),
+                    templates::process::argument("POD2MAN=", BuildPath::Host("/usr/bin/true"))
+                ],
+                environment
+            ),
+            // Assemble, archive, link, inspect, strip and run using produced tools.
+            // No target headers, startup objects or libc are required.
+            BuildStep::Write(BuildFile {
+                    path = BuildPath::Work("build/smoke.s");
+                    text = build_text(".global _start\n.text\n_start:\n mov $60, %eax\n xor %edi, %edi\n syscall\n.section .note.GNU-stack,\"\",@progbits\n");
+                }),
+            templates::process::run(
+                BuildPath::Work("build/gas/as-new"),
+                cwd,
+                [
+                    build_text("--64"),
+                    build_text("-o"),
+                    build_text("smoke.o"),
+                    build_text("smoke.s")
+                ],
+                []
+            ),
+            templates::process::run(
+                BuildPath::Work("build/binutils/ar"),
+                cwd,
+                [build_text("rcD"), build_text("smoke.a"), build_text("smoke.o")],
+                []
+            ),
+            templates::process::run(
+                BuildPath::Work("build/binutils/ranlib"),
+                cwd,
+                [build_text("smoke.a")],
+                []
+            ),
+            templates::process::run(
+                BuildPath::Work("build/ld/ld-new"),
+                cwd,
+                [
+                    build_text("-static"),
+                    build_text("--build-id=none"),
+                    build_text("-e"),
+                    build_text("_start"),
+                    build_text("-o"),
+                    build_text("smoke"),
+                    build_text("smoke.a")
+                ],
+                []
+            ),
+            templates::process::run(
+                BuildPath::Work("build/binutils/readelf"),
+                cwd,
+                [build_text("-h"), build_text("smoke")],
+                []
+            ),
+            templates::process::run(
+                BuildPath::Work("build/binutils/nm-new"),
+                cwd,
+                [build_text("--defined-only"), build_text("smoke")],
+                []
+            ),
+            templates::process::run(
+                BuildPath::Work("build/binutils/objdump"),
+                cwd,
+                [build_text("-d"), build_text("smoke")],
+                []
+            ),
+            templates::process::run(
+                BuildPath::Work("build/binutils/objcopy"),
+                cwd,
+                [build_text("--only-keep-debug"), build_text("smoke"), build_text("smoke.debug")],
+                []
+            ),
+            templates::process::run(
+                BuildPath::Work("build/binutils/strip-new"),
+                cwd,
+                [build_text("smoke")],
+                []
+            ),
+            templates::process::run(BuildPath::Work("build/smoke"), cwd, [], []),
+            BuildStep::Directory(BuildPath::Output("out", "usr/bin")),
+            install("gas/as-new", "as"),
+            install("ld/ld-new", "ld"),
+            install("binutils/ar", "ar"),
+            install("binutils/nm-new", "nm"),
+            install("binutils/ranlib", "ranlib"),
+            install("binutils/objcopy", "objcopy"),
+            install("binutils/objdump", "objdump"),
+            install("binutils/readelf", "readelf"),
+            install("binutils/strip-new", "strip"),
+            BuildStep::Directory(BuildPath::Output("out", "usr/x86_64-srx-linux-gnu/lib")),
+            BuildStep::Copy(
+                BuildPath::Work("build/ld/ldscripts"),
+                BuildPath::Output("out", "usr/x86_64-srx-linux-gnu/lib/ldscripts")
+            ),
+            BuildStep::Directory(BuildPath::Output("out", "usr/share/licenses/binutils")),
+            BuildStep::Copy(
+                BuildPath::Work("source/binutils-${version}/COPYING"),
+                BuildPath::Output("out", "usr/share/licenses/binutils/COPYING")
+            ),
+            BuildStep::Copy(
+                BuildPath::Work("source/binutils-${version}/COPYING3"),
+                BuildPath::Output("out", "usr/share/licenses/binutils/COPYING3")
+            ),
+            BuildStep::Copy(
+                BuildPath::Work("source/binutils-${version}/COPYING.LIB"),
+                BuildPath::Output("out", "usr/share/licenses/binutils/COPYING.LIB")
+            ),
+            BuildStep::Copy(
+                BuildPath::Work("source/binutils-${version}/COPYING3.LIB"),
+                BuildPath::Output("out", "usr/share/licenses/binutils/COPYING3.LIB")
+            ),
+            BuildStep::Copy(
+                BuildPath::Work("source/binutils-${version}/zlib/LICENSE"),
+                BuildPath::Output("out", "usr/share/licenses/binutils/zlib-LICENSE")
+            )
+        ];
+    }
+}

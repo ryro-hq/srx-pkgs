@@ -8,5 +8,7 @@
 /build.toml
 
 !/docs/*.md
+!/docs/contracts/*.md
+!/docs/evidence/*.md
 !/hosts/systemd/README.md
 __pycache__/

@@ -1,0 +1,157 @@
+pub fn bootstrap(source: support::Source) -> Recipe {
+    templates::recipe::from_source({
+            id = "e2fsprogs-bootstrap";
+            source = source;
+            build = program(source.version);
+            commands = [
+                Command {
+                    name = "mke2fs";
+                    output = "out";
+                    path = "usr/bin/mke2fs";
+                },
+                Command {
+                    name = "dumpe2fs";
+                    output = "out";
+                    path = "usr/bin/dumpe2fs";
+                },
+                Command {
+                    name = "e2fsck";
+                    output = "out";
+                    path = "usr/bin/e2fsck";
+                }
+            ];
+        })
+}
+fn program(version: PackagePinText) -> Build {
+    let cwd = BuildPath::Work("build");
+    let environment = [
+        templates::process::env("CC", build_path(BuildPath::Host("/usr/bin/gcc"))),
+        templates::process::env("CFLAGS", build_text("-O2 -g0")),
+        templates::process::env("PKG_CONFIG", build_path(BuildPath::Host("/usr/bin/false"))),
+        // Prevent optional host libraries and dlopen-backed features.
+        templates::process::env("ac_cv_lib_magic_magic_file", build_text("no")),
+        templates::process::env("ac_cv_func_dlopen", build_text("no"))
+    ];
+    Build {
+        profile = BuildProfile::HostBootstrap;
+        resources = BuildResources::Large;
+        source_format = BuildSourceFormat::Xz;
+        source_directory = "e2fsprogs-${version}";
+        timeout_seconds = 900;
+        steps = [
+            BuildStep::Extract(BuildPath::Work("source")),
+            BuildStep::Directory(cwd),
+            templates::process::run(
+                BuildPath::Host("/bin/sh"),
+                cwd,
+                [
+                    build_path(BuildPath::Work("source/e2fsprogs-${version}/configure")),
+                    templates::process::argument("--prefix=", BuildPath::Installed("out", "usr")),
+                    build_text("--disable-nls"),
+                    build_text("--disable-elf-shlibs"),
+                    build_text("--disable-fuse2fs"),
+                    build_text("--disable-uuidd"),
+                    build_text("--disable-imager"),
+                    build_text("--disable-defrag"),
+                    build_text("--disable-debugfs"),
+                    build_text("--disable-resizer"),
+                    build_text("--without-libarchive"),
+                    build_text("--enable-libuuid"),
+                    build_text("--enable-libblkid")
+                ],
+                environment
+            ),
+            templates::process::run(
+                BuildPath::Host("/usr/bin/make"),
+                cwd,
+                [build_text("-j2"), build_text("libs")],
+                environment
+            ),
+            templates::process::run(
+                BuildPath::Host("/usr/bin/make"),
+                cwd,
+                [
+                    build_text("-j2"),
+                    build_text("-C"),
+                    build_text("misc"),
+                    build_text("LDFLAGS_STATIC=-static"),
+                    build_text("mke2fs.static"),
+                    build_text("dumpe2fs.static")
+                ],
+                environment
+            ),
+            templates::process::run(
+                BuildPath::Host("/usr/bin/make"),
+                cwd,
+                [
+                    build_text("-j2"),
+                    build_text("-C"),
+                    build_text("e2fsck"),
+                    build_text("LDFLAGS_STATIC=-static"),
+                    build_text("e2fsck.static")
+                ],
+                environment
+            ),
+            // Exercise a disposable 64 MiB regular image inside private /work.
+            // This never mounts a filesystem or accesses a host block device.
+            templates::process::run(
+                BuildPath::Work("build/misc/mke2fs.static"),
+                cwd,
+                [
+                    build_text("-q"),
+                    build_text("-F"),
+                    build_text("-t"),
+                    build_text("ext4"),
+                    build_text("-b"),
+                    build_text("4096"),
+                    build_text("-N"),
+                    build_text("1024"),
+                    build_text("-m"),
+                    build_text("0"),
+                    build_text("-E"),
+                    build_text("lazy_itable_init=0,lazy_journal_init=0"),
+                    build_path(BuildPath::Work("build/smoke.ext4")),
+                    build_text("16384")
+                ],
+                [templates::process::env("MKE2FS_CONFIG", build_text("/dev/null"))]
+            ),
+            templates::process::run(
+                BuildPath::Work("build/e2fsck/e2fsck.static"),
+                cwd,
+                [
+                    build_text("-f"),
+                    build_text("-n"),
+                    build_path(BuildPath::Work("build/smoke.ext4"))
+                ],
+                []
+            ),
+            BuildStep::Directory(BuildPath::Output("out", "usr/bin")),
+            BuildStep::Directory(BuildPath::Output("out", "usr/share/licenses/e2fsprogs")),
+            BuildStep::Copy(
+                BuildPath::Work("build/misc/mke2fs.static"),
+                BuildPath::Output("out", "usr/bin/mke2fs")
+            ),
+            BuildStep::Copy(
+                BuildPath::Work("build/misc/dumpe2fs.static"),
+                BuildPath::Output("out", "usr/bin/dumpe2fs")
+            ),
+            BuildStep::Copy(
+                BuildPath::Work("build/e2fsck/e2fsck.static"),
+                BuildPath::Output("out", "usr/bin/e2fsck")
+            ),
+            BuildStep::Copy(
+                BuildPath::Work("source/e2fsprogs-${version}/NOTICE"),
+                BuildPath::Output("out", "usr/share/licenses/e2fsprogs/NOTICE")
+            ),
+            // Preserve the bundled libraries' individual notices and headers.
+            BuildStep::Copy(
+                BuildPath::Work("source/e2fsprogs-${version}/lib/uuid"),
+                BuildPath::Output("out", "usr/share/licenses/e2fsprogs/libuuid")
+            ),
+            BuildStep::Copy(
+                BuildPath::Work("source/e2fsprogs-${version}/lib/et"),
+                BuildPath::Output("out", "usr/share/licenses/e2fsprogs/libet")
+            )
+        ];
+    }
+}

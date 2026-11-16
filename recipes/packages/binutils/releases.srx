@@ -1,0 +1,11 @@
+// Upstream archive and detached signature admitted on 2026-10-21.
+pub fn source(const version: PackagePinText) -> support::Source {
+    match version {
+        "2.47" => support::Source {
+            version = "2.47";
+            url = "https://sourceware.org/pub/binutils/releases/binutils-2.47.tar.xz";
+            sha256 = "154ab23b60070e8f27013c22977f1129425d67d1e8acd6e13010e617811e4cff";
+            maximum_bytes = 33554432;
+        }
+    }
+}
