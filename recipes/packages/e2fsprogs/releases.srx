@@ -1,0 +1,11 @@
+// Published kernel.org checksum; qualification is tracked separately.
+pub fn source(const version: PackagePinText) -> support::Source {
+    match version {
+        "1.47.4" => support::Source {
+            version = "1.47.4";
+            url = "https://www.kernel.org/pub/linux/kernel/people/tytso/e2fsprogs/v1.47.4/e2fsprogs-1.47.4.tar.xz";
+            sha256 = "fd5bf388cbdbe006a3d3b318d983b2948382440acc85a87f1e7d108653e8db0b";
+            maximum_bytes = 8388608;
+        }
+    }
+}

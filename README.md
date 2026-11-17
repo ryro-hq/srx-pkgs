@@ -110,3 +110,17 @@ experimental package is qualified. Documentation-only changes skip VM publicatio
 Each release must retain source/signature evidence, host-bound reports, license
 information, SBOMs, vulnerability results and byte-bound attestations. See
 [controls and rollout evidence](docs/security/controls.md).
+
+## Experimental bootstrap tools
+
+These factories prepare the Linux system work in srx. They are outside the qualified
+matrix and grant no authority to format, mount or provision storage.
+
+| Factory | Builds | Contract |
+| --- | --- | --- |
+| `e2fsprogs_bootstrap` | Static ext4 tools from pinned 1.47.4 sources with an explicit host toolchain | [contract](docs/contracts/e2fsprogs-bootstrap.md) |
+| `binutils_bootstrap` | Assembler, linker and binary utilities 2.47 for `x86_64-srx-linux-gnu`, with an assemble/link/run smoke test | [contract](docs/contracts/binutils-bootstrap.md) |
+| `make_bootstrap` | Static GNU make 4.4.1, exercised by a Managed probe with the source-built binutils | [contract](docs/contracts/make-bootstrap.md) |
+
+A source-built compiler, target sysroot and complete managed bootstrap remain pending.
+Build evidence is kept in [docs/evidence](docs/evidence/).
