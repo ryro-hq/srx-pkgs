@@ -10,7 +10,7 @@ fn configuration() -> std::ConfigText {
     std::yaml::render(updated)
 }
 outputs {
-    os: std::Os = {
+    os: std::Services = {
         pkgs = [];
         services = [packages::k3s_service(std::package_recipe(packages::k3s({version = "1.37.1+k3s1";})), configuration())];
     };

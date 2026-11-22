@@ -178,7 +178,7 @@ fn configured() -> Result {
         fs::write(
             path.join("main.srx"),
             format!(
-                "inputs {{ catalog = \"modules:recipes\"; }} let selected = catalog::fixture::selected(); outputs {{ os: Os = Os {{ pkgs = []; services = {services}; }}; }}"
+                "inputs {{ catalog = \"modules:recipes\"; }} let selected = catalog::fixture::selected(); outputs {{ os: Services = Services {{ pkgs = []; services = {services}; }}; }}"
             ),
         )?;
         checked(path, error)?;
