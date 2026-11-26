@@ -20,6 +20,11 @@ manifest pin, and retains the corresponding output digests. Static host
 components require an explicit recipe review and guest inventory; a target
 label alone does not add a component or activate VEX.
 
+Replaying the six archived qualification bundles produced independent SPDX
+graphs: the three GNU applications linked dynamically to glibc, and the three
+musl applications linked statically to the reviewed guest component. The
+aggregate preflight stopped on the expired glibc assessment as expected.
+
 An isolated checkout pinned SRX PR #62 at `9a7bab5`, regenerated both locks and
 verified that all previous version identities remained pinned. The portable
 suite exercised the four extended scaffolds with the candidate. The catalog

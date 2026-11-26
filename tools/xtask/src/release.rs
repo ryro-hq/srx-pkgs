@@ -193,7 +193,8 @@ fn inventory(
         // A version can have both a static and a dynamic build. Give each
         // qualified application its own graph node, even if the source is shared.
         let application = format!("SPDXRef-Application-{identity}");
-        let mut application_package = component_source(directory, pin, &mut source_inventory)?;
+        let mut application_package =
+            component_source(input, directory, pin, &mut source_inventory)?;
         let context = format!(
             "Qualified combination {identity}; variant {}; target {}; bundle SHA256 {}.",
             text(&locked["package"], "variant")?,
@@ -236,7 +237,8 @@ fn inventory(
             let spdx = match spdx_ids.get(&component) {
                 Some(id) => id.clone(),
                 None => {
-                    let mut dependency = component_source(directory, pin, &mut source_inventory)?;
+                    let mut dependency =
+                        component_source(input, directory, pin, &mut source_inventory)?;
                     let id = format!("SPDXRef-Upstream-{}", packages.len());
                     dependency["SPDXID"] = json!(id);
                     packages.push(dependency);
@@ -327,6 +329,7 @@ fn reviewed_component<'a>(policy: &'a Value, name: &str, version: &str) -> Resul
 }
 
 fn component_source(
+    input: &Path,
     directory: &Path,
     pin: &Value,
     inventory: &mut BTreeMap<String, Value>,
@@ -335,7 +338,7 @@ fn component_source(
     if let Some(package) = inventory.get(&key) {
         return Ok(package.clone());
     }
-    let package = upstream(directory, pin)?;
+    let package = upstream(input, directory, pin)?;
     inventory.insert(key, package.clone());
     Ok(package)
 }
@@ -391,7 +394,7 @@ fn hex_pin(text: &str) -> bool {
             .bytes()
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
-fn upstream(directory: &Path, policy: &Value) -> Result<Value> {
+fn upstream(input: &Path, directory: &Path, policy: &Value) -> Result<Value> {
     let name = text(policy, "name")?;
     let version = text(policy, "version")?;
     let url = text(policy, "url")?;
@@ -410,12 +413,17 @@ fn upstream(directory: &Path, policy: &Value) -> Result<Value> {
         return Err("unsafe upstream filename".into());
     }
     let archive = sources.join(format!("{name}-{version}.tar"));
-    download_pinned(&url, &pin, &archive)?;
+    obtain_source(input, &url, &pin, &archive)?;
     // A reviewed license archive is needed when distributable source bytes are
     // not themselves a tar archive (e.g. raw upstream executables).
     let (license_archive, legal_root) = if let Some(license) = policy.get("license_archive") {
         let path = sources.join(format!("{name}-{version}-license.tar"));
-        download_pinned(&text(license, "url")?, &text(license, "sha256")?, &path)?;
+        obtain_source(
+            input,
+            &text(license, "url")?,
+            &text(license, "sha256")?,
+            &path,
+        )?;
         (path, text(license, "root")?)
     } else {
         (archive, format!("{name}-{version}"))
@@ -503,12 +511,31 @@ fn upstream(directory: &Path, policy: &Value) -> Result<Value> {
     Ok(result)
 }
 
-fn download_pinned(url: &str, pin: &str, archive: &Path) -> Result {
+fn obtain_source(input: &Path, url: &str, pin: &str, archive: &Path) -> Result {
     if !url.starts_with("https://") || url.contains(['\n', '\r', '\0']) {
         return Err("unsafe upstream source URL".into());
     }
     if !hex_pin(pin) {
         return Err("invalid upstream SHA-256 pin".into());
+    }
+    let retained = input
+        .join("sources")
+        .join(archive.file_name().ok_or("missing source name")?);
+    match fs::symlink_metadata(&retained) {
+        Ok(meta) => {
+            if !meta.is_file() || meta.len() > 128 * 1024 * 1024 || digest(&retained)? != pin {
+                return Err("retained source archive differs from the reviewed pin".into());
+            }
+            if retained != archive {
+                fs::copy(&retained, archive)?;
+                if digest(archive)? != pin {
+                    return Err("retained source archive changed while copying".into());
+                }
+            }
+            return Ok(());
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error.into()),
     }
     if !Command::new("curl")
         .args([
@@ -715,6 +742,36 @@ mod tests {
         assert!(validate_scan(&json!({})).is_err());
         validate_scan(&json!({"matches":[]})).unwrap();
         validate_scan(&json!({"matches":[{"vulnerability":{"severity":"Low"}}]})).unwrap();
+    }
+    #[test]
+    fn retained_source_can_be_reused_only_if_it_matches_the_pin() {
+        let input = tempfile::tempdir().unwrap();
+        let output = tempfile::tempdir().unwrap();
+        let sources = input.path().join("sources");
+        fs::create_dir(&sources).unwrap();
+        let retained = sources.join("sample.tar");
+        let staged = output.path().join("sample.tar");
+        fs::write(&retained, "reviewed bytes").unwrap();
+        let pin = digest(&retained).unwrap();
+        obtain_source(
+            input.path(),
+            "https://example.invalid/sample.tar",
+            &pin,
+            &staged,
+        )
+        .unwrap();
+        assert_eq!(digest(&staged).unwrap(), pin);
+        fs::write(&retained, "different bytes").unwrap();
+        assert!(
+            obtain_source(
+                input.path(),
+                "https://example.invalid/sample.tar",
+                &pin,
+                &staged
+            )
+            .is_err()
+        );
+        assert_eq!(digest(&staged).unwrap(), pin);
     }
     #[test]
     fn release_checksums_bind_bytes_and_reject_symlinks() {

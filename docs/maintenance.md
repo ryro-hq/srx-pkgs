@@ -89,6 +89,8 @@ evidence and refuses changed database or artifact identities; regenerate on a
 database change. A failed scan can leave an `INCOMPLETE` directory with
 diagnostics; it is not passing evidence and must not be published. These
 commands are not a substitute for both VM runs or signed release attestation.
+Retained source archives can be reused only after checking their reviewed
+SHA-256; otherwise the source is downloaded when it is absent.
 
 Review the exact versions in `security/runtime-dependencies.json`. The site of
 the build or its target ABI does not identify linked components. The runtime
