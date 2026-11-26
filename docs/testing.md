@@ -24,7 +24,10 @@ CI lane for relevant changes and weekly qualification.
 matrix MATRIX.json` expands each identity across hosts without allowing metadata
 overrides. `record HOST DIRECTORY` binds image/runtime/firmware hashes; `verify
 HOST DIRECTORY` binds every successful report and confirmed cleanup to the manifest.
-Artifacts/caches are separated by host, core pin, environment and package identity.
+Each native qualification job builds in a fresh private Store. Do not restore
+or save a full Store as a CI cache: cross-run materialized views can be rejected
+by the guest's integrity checks. The separately pinned environment cache and
+the qualification reports and bundles are still retained.
 
 Only root prose documents and `docs/*.md` are eligible for the conservative doc-only
 classification. Unknown paths, recipes, contracts, locks, dependency/tool/workflow

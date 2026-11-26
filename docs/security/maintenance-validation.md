@@ -36,3 +36,17 @@ access list, and this account could not open `/dev/kvm` read/write for the
 pinned guest. No isolation control was disabled. Run the native matrix in the
 catalog CI after the core revision is integrated; portable checks and
 inspection of historical bundles are not a substitute.
+
+## Fresh Store for native CI
+
+[PR #11's first CI run](https://github.com/ryro-hq/srx-pkgs/actions/runs/45895441255)
+started the pinned guests but all twelve qualification rows reported
+`view file mode or size changed`. A
+[main run on October 25](https://github.com/ryro-hq/srx-pkgs/actions/runs/40179643439/job/121128675818)
+reported the same error after a Store cache hit. The same Debian Hello/musl
+combination [passed with no cached Store](https://github.com/ryro-hq/srx-pkgs/actions/runs/43711536720/job/132809407490).
+
+Qualification now uses an empty private Store per job; it does not restore or
+save materialized views. The environment artifact, materialization checks,
+native matrix and offline import requirements are unchanged. The fixed workflow
+still needs a fresh hosted run.

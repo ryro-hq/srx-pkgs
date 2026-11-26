@@ -206,11 +206,6 @@ jobs:
           test -c /dev/kvm
           sudo chown "$(id -u):$(id -g)" /dev/kvm
           sudo chmod 660 /dev/kvm
-      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
-        id: store-cache
-        with:
-          path: .store
-          key: store-${{ matrix.host }}-${{ matrix.system }}-${{ matrix.identity }}-${{ hashFiles('.syrox-core', '.environment/SHA256SUMS') }}
       - name: Configure exact source permissions
         run: |
           {
@@ -225,18 +220,16 @@ jobs:
           QUALIFICATION_HOST: ${{ matrix.host }}
           SYROX_VM_CONFIG: ${{ github.workspace }}/.environment/job.json
         run: |
+          # A restored Store can contain materialized views the guest rejects.
+          # Keep the metadata checks: qualify each row in a fresh private Store.
+          store=$(mktemp -d "${RUNNER_TEMP:?}/srx-catalog-store.XXXXXXXX")
           target/catalog-candidate/catalog-harness --prepare \
             --image-archive "$PWD/../.environment/image.tar" \
             --runtime "$PWD/../.environment/msb" --firmware "$PWD/../.environment/libkrunfw.so.5.6.1" \
             --profile native --candidate-bundle "$PWD/target/catalog-candidate"
           target/catalog-candidate/catalog-harness --qualify-catalog \
-            "$PWD/.." "$IDENTITY" "$PWD/../build.toml" "$PWD/../.store" "$PWD/../.evidence"
+            "$PWD/.." "$IDENTITY" "$PWD/../build.toml" "$store" "$PWD/../.evidence"
           cp ../.evidence/qualification-vm.json "../.evidence/results/$IDENTITY.$QUALIFICATION_HOST.vm.json"
-      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
-        if: github.ref == 'refs/heads/main' && steps.store-cache.outputs.cache-hit != 'true'
-        with:
-          path: .store
-          key: ${{ steps.store-cache.outputs.cache-primary-key }}
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
