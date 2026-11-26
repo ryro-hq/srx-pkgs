@@ -368,6 +368,10 @@ jobs:
     needs: [changes, verify]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-24.04
+    environment: catalog-publication
+    defaults:
+      run:
+        shell: bash
     permissions:
       contents: write
       attestations: write
@@ -376,13 +380,24 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+      - name: Require immutable releases before processing publication assets
+        env:
+          GH_TOKEN: ${{ secrets.CATALOG_IMMUTABILITY_READ_TOKEN }}
+        run: bash .github/scripts/require-immutable-releases.sh
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: release
           path: .release
       - name: Verify release bytes and archive the complete payload
         run: |
-          (cd .release && sha256sum --check SHA256SUMS)
+          (
+            cd .release
+            test -z "$(find . -mindepth 1 ! -type f ! -type d -print -quit)"
+            while IFS= read -r -d '' file; do
+              sha256sum -- "${file#./}"
+            done < <(find . -type f ! -path ./SHA256SUMS -print0 | LC_ALL=C sort -z)
+          ) > "$RUNNER_TEMP/SHA256SUMS.computed"
+          cmp .release/SHA256SUMS "$RUNNER_TEMP/SHA256SUMS.computed"
           tar -czf catalog-payload.tar.gz -C .release .
           sha256sum catalog-payload.tar.gz > catalog-payload.tar.gz.sha256
       - name: Bind release bytes to the trusted publishing workflow
@@ -399,7 +414,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           tag="catalog-$GITHUB_SHA"
-          test "$(gh api "repos/$GITHUB_REPOSITORY/immutable-releases" --jq .enabled)" = true
           gh attestation verify catalog-payload.tar.gz --repo "$GITHUB_REPOSITORY" \
             --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/catalog.yml" --source-digest "$GITHUB_SHA"
           gh attestation trusted-root > trusted_root.jsonl
@@ -411,8 +425,37 @@ jobs:
               --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/catalog.yml" \
               --source-digest "$GITHUB_SHA" --predicate-type "$predicate" --deny-self-hosted-runners
           done
-          gh release create "$tag" --target "$GITHUB_SHA" --draft --title "$tag" \
+          cp "sha256:$digest.jsonl" attestations.jsonl
+          assets=(catalog-payload.tar.gz catalog-payload.tar.gz.sha256 attestations.jsonl trusted_root.jsonl
+                  .release/sbom.spdx.json .release/grype.json .release/SHA256SUMS Catalog.lock Syrox.lock catalog.toml)
+          existing_tag=$(git ls-remote --tags origin "refs/tags/$tag")
+          test -z "$existing_tag"
+          gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --draft --title "$tag" \
             --notes 'Native GNU/musl qualification in pinned Debian and Ubuntu userspaces on Linux 6.12.109. Canonical Debian bundles, separate userspace manifests, pinned upstream provenance and offline runtime checks.' \
-            catalog-payload.tar.gz catalog-payload.tar.gz.sha256 "sha256:$digest.jsonl" trusted_root.jsonl .release/sbom.spdx.json .release/grype.json .release/SHA256SUMS Catalog.lock Syrox.lock catalog.toml
-          gh release edit "$tag" --draft=false
-          test "$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" --jq .immutable)" = true
+            "${assets[@]}"
+          draft_url=$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json apiUrl,isDraft --jq \
+            'select(.isDraft == true) | .apiUrl')
+          draft=${draft_url#"https://api.github.com/repos/$GITHUB_REPOSITORY/releases/"}
+          [[ "$draft" =~ ^[0-9]+$ ]]
+          gh api "repos/$GITHUB_REPOSITORY/releases/$draft" > "$RUNNER_TEMP/catalog-draft.json"
+          jq -e --arg target "$GITHUB_SHA" --arg tag "$tag" --argjson count "${#assets[@]}" \
+            '.draft and .target_commitish == $target and .tag_name == $tag and (.assets | length == $count)' \
+            "$RUNNER_TEMP/catalog-draft.json"
+          for asset in "${assets[@]}"; do
+            hash=$(sha256sum "$asset" | cut -d' ' -f1)
+            jq -e --arg name "${asset##*/}" --arg digest "sha256:$hash" \
+              '[.assets[] | select(.name == $name and .state == "uploaded" and .digest == $digest)] | length == 1' \
+              "$RUNNER_TEMP/catalog-draft.json"
+          done
+      - name: Recheck immutability before undrafting
+        env:
+          GH_TOKEN: ${{ secrets.CATALOG_IMMUTABILITY_READ_TOKEN }}
+        run: bash .github/scripts/require-immutable-releases.sh
+      - name: Publish the checked draft and verify the immutable result
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="catalog-$GITHUB_SHA"
+          gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" --jq '.immutable == true and .draft == false' | grep -qx true
+          test "$(gh api "repos/$GITHUB_REPOSITORY/commits/$tag" --jq .sha)" = "$GITHUB_SHA"
