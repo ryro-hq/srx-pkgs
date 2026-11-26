@@ -1,0 +1,35 @@
+pub struct Options {
+    directory: SourceDirectory;
+    compile_arguments: [BuildText] = [build_text("-j2")];
+    install_arguments: [BuildText] = [build_text("install")];
+    timeout_seconds: BuildTimeout = 180;
+}
+
+pub fn gnu(source: support::Source) -> Recipe {
+    builders::recipe::from_source({
+        id = "@{name}";
+        source = source;
+        build = program({directory = @{directory};});
+        build_inputs = builders::recipe::selected_inputs([recipe_output(glibc::runtime, "dev"), recipe_output(glibc::runtime, "out")]);
+        // Declare command paths only after reviewing installed outputs.
+    })
+}
+
+fn program(options: Options) -> Build {
+    let cwd = BuildPath::Work("source/${options.directory}");
+    let make = BuildPath::Host("/usr/bin/make");
+    let env = lib::gnu::environment();
+    let variables = [
+        builders::process::argument("CC=", BuildPath::Work("cc")),
+        builders::process::argument("PREFIX=", BuildPath::Installed("out", "usr"))
+    ];
+    Build {
+        profile = BuildProfile::HostBootstrap;
+        source_directory = options.directory;
+        timeout_seconds = options.timeout_seconds;
+        steps = [BuildStep::Extract(BuildPath::Work("source"))] ++ lib::gnu::setup() ++ [
+            builders::process::run(make, cwd, options.compile_arguments ++ variables, env),
+            builders::process::run(make, cwd, options.install_arguments ++ variables ++ [build_text("DESTDIR=/out")], env)
+        ];
+    }
+}

@@ -86,13 +86,21 @@ fn suite(name: &str) -> Result {
         "projections" => projections::check(),
         "examples" => examples::check(),
         "authoring" => projections::authoring(),
+        "scaffolds" => projections::extended_scaffolds(),
         "all" => {
             projections::check()?;
             projections::authoring()?;
+            if srx(&["catalog", "new", "--help"])?.contains("prebuilt") {
+                projections::extended_scaffolds()?;
+            } else {
+                println!(
+                    "extended scaffolds require a newer core (run --suite scaffolds with that binary)"
+                );
+            }
             examples::check()?;
             run("cargo", &["test", "--locked", "-p", "xtask"])
         }
-        _ => Err("suite must be all, projections, authoring or examples".into()),
+        _ => Err("suite must be all, projections, authoring, scaffolds or examples".into()),
     }
 }
 fn execute() -> Result {

@@ -1,0 +1,38 @@
+pub struct Options {
+    directory: SourceDirectory;
+    definitions: [BuildText] = [];
+    timeout_seconds: BuildTimeout = 180;
+}
+
+pub fn gnu(source: support::Source) -> Recipe {
+    builders::recipe::from_source({
+        id = "@{name}";
+        source = source;
+        build = program({directory = @{directory};});
+        build_inputs = builders::recipe::selected_inputs([recipe_output(glibc::runtime, "dev"), recipe_output(glibc::runtime, "out")]);
+        // Declare command paths only after reviewing installed outputs.
+    })
+}
+
+fn program(options: Options) -> Build {
+    let cwd = BuildPath::Work("build");
+    let cmake = BuildPath::Host("/usr/bin/cmake");
+    let env = lib::gnu::environment();
+    Build {
+        profile = BuildProfile::HostBootstrap;
+        source_directory = options.directory;
+        timeout_seconds = options.timeout_seconds;
+        steps = [BuildStep::Extract(BuildPath::Work("source"))] ++ lib::gnu::setup() ++ [
+            BuildStep::Directory(cwd),
+            builders::process::run(cmake, cwd, [
+                build_text("-S"), build_path(BuildPath::Work("source/${options.directory}")),
+                build_text("-B"), build_text("."),
+                build_text("-G"), build_text("Unix Makefiles"),
+                builders::process::argument("-DCMAKE_INSTALL_PREFIX=", BuildPath::Installed("out", "usr")),
+                build_text("-DFETCHCONTENT_FULLY_DISCONNECTED=ON")
+            ] ++ options.definitions, lib::gnu::configure_environment()),
+            builders::process::run(cmake, cwd, [build_text("--build"), build_text("."), build_text("--parallel"), build_text("2")], env),
+            builders::process::run(cmake, cwd, [build_text("--install"), build_text(".")], env ++ [builders::process::env("DESTDIR", build_text("/out"))])
+        ];
+    }
+}

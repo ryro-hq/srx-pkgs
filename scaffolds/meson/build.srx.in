@@ -1,0 +1,37 @@
+pub struct Options {
+    directory: SourceDirectory;
+    definitions: [BuildText] = [];
+    timeout_seconds: BuildTimeout = 180;
+}
+
+pub fn gnu(source: support::Source) -> Recipe {
+    builders::recipe::from_source({
+        id = "@{name}";
+        source = source;
+        build = program({directory = @{directory};});
+        build_inputs = builders::recipe::selected_inputs([recipe_output(glibc::runtime, "dev"), recipe_output(glibc::runtime, "out")]);
+        // Declare command paths only after reviewing installed outputs.
+    })
+}
+
+fn program(options: Options) -> Build {
+    let cwd = BuildPath::Work("build");
+    let meson = BuildPath::Host("/usr/bin/meson");
+    let env = lib::gnu::environment();
+    Build {
+        profile = BuildProfile::HostBootstrap;
+        source_directory = options.directory;
+        timeout_seconds = options.timeout_seconds;
+        steps = [BuildStep::Extract(BuildPath::Work("source"))] ++ lib::gnu::setup() ++ [
+            BuildStep::Directory(cwd),
+            builders::process::run(meson, cwd, [
+                build_text("setup"), build_text("."),
+                build_path(BuildPath::Work("source/${options.directory}")),
+                builders::process::argument("--prefix=", BuildPath::Installed("out", "usr")),
+                build_text("--wrap-mode=nodownload")
+            ] ++ options.definitions, lib::gnu::configure_environment()),
+            builders::process::run(meson, cwd, [build_text("compile"), build_text("-j"), build_text("2")], env),
+            builders::process::run(meson, cwd, [build_text("install"), build_text("--no-rebuild")], env ++ [builders::process::env("DESTDIR", build_text("/out"))])
+        ];
+    }
+}

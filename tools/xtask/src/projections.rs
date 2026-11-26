@@ -200,6 +200,9 @@ fn fixture(path: &Path) -> Result {
     Ok(())
 }
 fn generate(path: &Path, name: &str, dry: bool) -> Result<Value> {
+    generate_with(path, name, "autotools", dry)
+}
+fn generate_with(path: &Path, name: &str, kind: &str, dry: bool) -> Result<Value> {
     let mut args = vec![
         "catalog",
         "new",
@@ -209,12 +212,22 @@ fn generate(path: &Path, name: &str, dry: bool) -> Result<Value> {
         "--version",
         "1.2.3",
         "--url",
-        "https://example.org/$archive/sample-1.2.3.tar.gz",
+        if kind == "prebuilt" {
+            "https://example.org/$archive/sample-linux-amd64"
+        } else {
+            "https://example.org/$archive/sample-1.2.3.tar.gz"
+        },
         "--sha256",
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "--maximum-bytes",
         "2097152",
     ];
+    if kind != "autotools" {
+        args.extend(["--scaffold", kind]);
+    }
+    if kind == "prebuilt" {
+        args.extend(["--binary-name", "sample-tool"]);
+    }
     if dry {
         args.push("--dry-run");
     }
@@ -293,6 +306,69 @@ pub(super) fn authoring() -> Result {
     }
     println!(
         "scaffolds: dry run, literal escaping, collisions, concurrency and generated package projection passed"
+    );
+    Ok(())
+}
+
+pub(super) fn extended_scaffolds() -> Result {
+    let temporary = project()?;
+    let path = temporary.path();
+    fixture(path)?;
+    for (kind, expected) in [
+        ("cmake", "/usr/bin/cmake"),
+        ("meson", "--wrap-mode=nodownload"),
+        ("make", "DESTDIR=/out"),
+        ("prebuilt", "ValidateStaticElf"),
+    ] {
+        let name = format!("sample_{kind}");
+        let before = fs::read(path.join("main.srx"))?;
+        let preview = generate_with(path, &name, kind, true)?;
+        let build = preview["files"]["build.srx"]
+            .as_str()
+            .ok_or("missing scaffold build")?;
+        if !build.contains(expected)
+            || fs::read(path.join("main.srx"))? != before
+            || path.join("recipes/packages").join(&name).exists()
+        {
+            return Err(format!("incorrect {kind} dry run").into());
+        }
+        let result = generate_with(path, &name, kind, false)?;
+        if result["status"] != "experimental" {
+            return Err(format!("{kind} scaffold promoted an unqualified package").into());
+        }
+    }
+    let main = fs::read_to_string(path.join("main.srx"))?;
+    fs::write(
+        path.join("main.srx"),
+        format!(
+            r#"{main}
+let a = sample_cmake({{ version = "1.2.3"; }});
+let b = sample_meson({{ version = "1.2.3"; }});
+let c = sample_make({{ version = "1.2.3"; }});
+let d = sample_prebuilt({{ version = "1.2.3"; }});
+outputs {{ shell: Shell = Shell {{ pkgs = [select_output(a, "out"), select_output(b, "out"), select_output(c, "out"), select_output(d, "out")]; services = []; }}; }}
+"#
+        ),
+    )?;
+    let planned = plan(path)?;
+    for kind in ["cmake", "meson", "make", "prebuilt"] {
+        if !planned.contains(&format!("sample_{kind}-1.2.3-linux-x86_64-gnu")) {
+            return Err(format!("{kind} did not project the exact version and platform").into());
+        }
+    }
+    let before = fs::read_to_string(path.join("main.srx"))?;
+    fs::write(
+        path.join("main.srx"),
+        before.replace(
+            "sample_prebuilt({ version = \"1.2.3\"; })",
+            "sample_prebuilt({ version = \"1.2.3\"; system = \"linux-aarch64-gnu\"; })",
+        ),
+    )?;
+    if checked(path, None).is_ok() {
+        return Err("prebuilt accepted a different architecture".into());
+    }
+    println!(
+        "extended scaffolds: four dry runs, generation, exact projections and wrong-target rejection passed"
     );
     Ok(())
 }
