@@ -1,0 +1,13 @@
+# Maintenance rollout evidence — 2026-11-26
+
+These checks were performed without updating the protected branch, secrets,
+repository settings or releases. They are not release approval.
+
+| Control | Local evidence | Remaining rollout |
+| --- | --- | --- |
+| Extended authoring | Four dry runs and generated recipes passed typed project/plan checks. A wrong prebuilt target was rejected. | Publish/pin the compatible core and run native build/qualification fixtures. The repository still uses its exact baseline core; the format repin in [#9](https://github.com/ryro-hq/srx-pkgs/pull/9) and bootstrap recipes in [#8](https://github.com/ryro-hq/srx-pkgs/pull/8) were deliberately not adopted here. |
+| Scheduled updates | Read-only observation authenticated nginx 1.30.8 using the pinned nginx authority and validated its staged diff and exact locks. Hello 2.12.3 presented a different signer and was rejected, without discarding the verified nginx candidate. | Review the Hello signer separately. After #6, exercise scheduled mode and the two App installations with a real protected PR. |
+| Assessments | Scoped-hash tests distinguish unrelated lock changes from recipe changes. Current `vex-status` warns; the required check rejects the expired glibc assessment. Renewal produced a candidate diff without changing the policy date. | A maintainer must re-evaluate the VEX and approve any new expiry before a GNU release can use it. |
+| Per-package evidence | Re-imported bundles from [run 39555337165](https://github.com/ryro-hq/srx-pkgs/actions/runs/39555337165) offline using the pinned core; the resulting manifest was byte-identical. Per-package evidence for Hello 2.12.1 musl generated licenses/SPDX and retained a real Grype report from the 2026-11-26 database. One high finding correctly blocked it, and `check` refused the incomplete output. | Review the finding and qualify with the current accepted runtime. Positive check/evidence comparisons are covered with fixtures; no passing live result is claimed from this scan. |
+| Immutable publication | The historical job log showed HTTP 403 on the first immutable-settings request. The regression exercises missing credentials, 403, 404, malformed/disabled responses and enabled settings. | Configure the read-only Administration credential and publish/verify a new immutable release, including byte and offline-import checks of the actual published payload. |
+| Measurement | The [maintenance guide](../maintenance.md#measure-authoring-effort) records controlled before/after local plan timings. | Measure human author time and CI wait on a representative qualified package. |

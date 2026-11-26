@@ -19,13 +19,18 @@ The first complete catalog matrix exposed these four blocking scanner matches:
 `security/vex/glibc-2.44.openvex.json` records these exact assessments. Its package
 URL includes the SHA256 identity of the patch set, so its fixed statement does
 not address unpatched glibc 2.44. `security/vex/policy.json` binds the document,
-source, patch bytes and complete catalog lock, with expiry on 2026-11-20. Changes
-to any bound input require a renewed assessment. No independent human review is
-claimed.
+source, patch bytes and exact reviewed glibc recipe inputs (`GLIBC_INPUTS` in
+`tools/xtask/src/release/vex.rs`). Catalog and project locks identify releases
+separately. An unrelated lock change does not renew or invalidate the assessment;
+a change to its recipe, core pin, source or patch context does.
 
-Daily audits and dependency-policy jobs validate these bindings and expiry.
+The recorded assessment expired on **2026-11-20**. The scope migration does not
+renew it. The daily audit fails on expiry and dependency-policy reports it
+without using it as a suppression gate. Both warn during the 30 days before
+expiry. See the [maintenance guide](../maintenance.md#renew-a-security-assessment).
+
 Release preflight also verifies the retained source and patch files, supplies the
-validated OpenVEX to Grype and rejects every suppressed match outside the exact
+validated, unexpired OpenVEX to Grype and rejects every suppressed match outside the exact
 package/CVE/status inventory. The complete report retains `ignoredMatches` for
 inspection. Other high, critical or unknown-severity findings continue to block.
 The release retains the VEX document and policy alongside sources, licenses,
