@@ -3,11 +3,29 @@ use super::Result;
 use serde_json::{Value, json};
 use sha2::{Digest as _, Sha256};
 use std::fmt::Write as _;
-use std::{collections::BTreeSet, fs, io::Read as _, path::Path, process::Command};
+use std::{
+    collections::BTreeSet,
+    fs,
+    io::{Read as _, Write as _},
+    path::Path,
+    process::{Command, Stdio},
+};
+mod evidence;
 mod vex;
 
-pub(super) fn check_vex_review() -> Result {
-    vex::check_review()
+pub(super) use evidence::execute as package_evidence;
+
+pub(super) fn vex_status(required: bool) -> Result {
+    vex::status(required)
+}
+
+pub(super) fn vex_scope() -> Result {
+    println!("{}", vex::recipe_scope(Path::new("."))?);
+    Ok(())
+}
+
+pub(super) fn renew_vex(id: &str, date: &str, evidence: &str) -> Result {
+    vex::renew(id, date, evidence)
 }
 
 fn output(program: &str, args: &[&str]) -> Result<String> {
@@ -18,8 +36,9 @@ fn output(program: &str, args: &[&str]) -> Result<String> {
     Ok(String::from_utf8(result.stdout)?)
 }
 fn read(path: &Path) -> Result<Value> {
-    if fs::symlink_metadata(path)?.len() > 64 * 1024 * 1024 {
-        return Err("oversized release metadata".into());
+    let meta = fs::symlink_metadata(path)?;
+    if !meta.is_file() || meta.len() > 64 * 1024 * 1024 {
+        return Err("expected bounded regular release metadata".into());
     }
     Ok(serde_json::from_slice(&fs::read(path)?)?)
 }
@@ -97,9 +116,24 @@ fn relation(from: &str, kind: &str, to: &str) -> Value {
 }
 
 pub(super) fn catalog(directory: &Path) -> Result {
+    let manifest = read(&directory.join("manifest.json"))?;
+    inventory(directory, directory, &manifest, None)?;
+    Ok(())
+}
+
+fn inventory(
+    input: &Path,
+    directory: &Path,
+    manifest: &Value,
+    selection: Option<&evidence::Selection<'_>>,
+) -> Result<(bool, Vec<Value>)> {
     let policy = read(Path::new("security/package-licenses.json"))?;
     let lock = read(Path::new("Catalog.lock"))?;
-    let manifest = read(&directory.join("manifest.json"))?;
+    if manifest["catalog_lock_sha256"] != digest(Path::new("Catalog.lock"))?
+        || manifest["project_lock_sha256"] != digest(Path::new("Syrox.lock"))?
+    {
+        return Err("release manifest does not bind the current catalog and project locks".into());
+    }
     let commit = output("git", &["rev-parse", "HEAD"])?;
     let commit = commit.trim();
     let mut packages = Vec::new();
@@ -107,12 +141,16 @@ pub(super) fn catalog(directory: &Path) -> Result {
     let mut seen = BTreeSet::new();
     let mut gnu = false;
     let mut musl = false;
+    let mut qualified = Vec::new();
     for report in manifest["packages"]
         .as_array()
         .filter(|rows| !rows.is_empty())
         .ok_or("empty release manifest")?
     {
         let identity = text(report, "identity")?;
+        if !hex_pin(&identity) {
+            return Err("invalid locked combination identity".into());
+        }
         let locked = lock["versions"]
             .as_array()
             .ok_or("missing locked versions")?
@@ -121,6 +159,14 @@ pub(super) fn catalog(directory: &Path) -> Result {
             .ok_or("manifest identity absent from current lock")?;
         let name = text(&locked["package"], "name")?;
         let version = text(&locked["package"], "version")?;
+        if report["system"] != locked["package"]["system"]
+            || report["version"] != locked["package"]["version"]
+        {
+            return Err("release report does not match its locked combination".into());
+        }
+        if selection.is_some_and(|selection| !selection.matches(&locked["package"])) {
+            continue;
+        }
         if report["system"] == "linux-x86_64-gnu" {
             gnu = true;
         } else if report["system"] == "linux-x86_64-musl" {
@@ -128,10 +174,11 @@ pub(super) fn catalog(directory: &Path) -> Result {
         } else {
             return Err("unreviewed release ABI".into());
         }
-        let bundle = directory.join(format!("{identity}.bundle"));
+        let bundle = input.join(format!("{identity}.bundle"));
         if report["bundle_sha256"] != digest(&bundle)? {
             return Err("release bundle changed after qualification".into());
         }
+        qualified.push(report.clone());
         if seen.insert(format!("{name}@{version}")) {
             let pin = policy["packages"]
                 .as_array()
@@ -146,6 +193,9 @@ pub(super) fn catalog(directory: &Path) -> Result {
             }
             packages.push(upstream(directory, pin, packages.len())?);
         }
+    }
+    if qualified.is_empty() || (selection.is_some() && qualified.len() != 1) {
+        return Err("no unique qualified package/version/variant/system matches".into());
     }
     if gnu {
         let libc = policy["packages"]
@@ -163,8 +213,8 @@ pub(super) fn catalog(directory: &Path) -> Result {
         packages.push(upstream(directory, libc, packages.len())?);
     }
     if musl {
-        let host = read(&directory.join("host-debian.json"))?;
-        let sbom_path = directory.join("host-debian.spdx.json");
+        let host = read(&input.join("host-debian.json"))?;
+        let sbom_path = input.join("host-debian.spdx.json");
         if host["sbom_sha256"] != digest(&sbom_path)? {
             return Err("host SBOM differs from its bound qualification environment".into());
         }
@@ -186,7 +236,7 @@ pub(super) fn catalog(directory: &Path) -> Result {
             return Err("musl SBOM lacks package identity for vulnerability matching".into());
         }
         packages.push(runtime);
-        let license_path = directory.join("musl-debian.copyright");
+        let license_path = input.join("musl-debian.copyright");
         if host["musl_copyright_sha256"] != digest(&license_path)? {
             return Err("musl copyright differs from the qualified guest".into());
         }
@@ -202,16 +252,31 @@ pub(super) fn catalog(directory: &Path) -> Result {
         ));
     }
     legal_files(Path::new("."), &directory.join("licenses/srx-pkgs"))?;
+    let namespace = match selection {
+        Some(_) => format!("{commit}/{}", text(&qualified[0], "identity")?),
+        None => commit.to_owned(),
+    };
     encode(
         &directory.join("sbom.spdx.json"),
         &document(
             "ryro-hq/srx-pkgs",
-            &format!("https://github.com/ryro-hq/srx-pkgs/sbom/{commit}"),
+            &format!("https://github.com/ryro-hq/srx-pkgs/sbom/{namespace}"),
             packages,
             relations,
         ),
     )?;
-    scan(directory)
+    if selection.is_none() {
+        scan(directory, gnu, Path::new("grype"))?;
+        checksums(directory)?;
+    }
+    Ok((gnu, qualified))
+}
+
+fn hex_pin(text: &str) -> bool {
+    text.len() == 64
+        && text
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
 fn upstream(directory: &Path, policy: &Value, index: usize) -> Result<Value> {
     let name = text(policy, "name")?;
@@ -220,72 +285,68 @@ fn upstream(directory: &Path, policy: &Value, index: usize) -> Result<Value> {
     let pin = text(policy, "sha256")?;
     let sources = directory.join("sources");
     fs::create_dir_all(&sources)?;
-    if !name.bytes().all(|b| b.is_ascii_lowercase())
-        || !version.bytes().all(|b| b.is_ascii_digit() || b == b'.')
-    {
+    let safe_component = |part: &str| {
+        !part.is_empty()
+            && part.len() <= 128
+            && part.as_bytes()[0].is_ascii_alphanumeric()
+            && part
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b"._+-".contains(&b))
+    };
+    if !safe_component(&name) || !safe_component(&version) {
         return Err("unsafe upstream filename".into());
     }
     let archive = sources.join(format!("{name}-{version}.tar"));
-    if !url.starts_with("https://") || url.contains(['\n', '\r', '\0']) {
-        return Err("unsafe upstream source URL".into());
-    }
-    if !Command::new("curl")
-        .args([
-            "--fail",
-            "--silent",
-            "--show-error",
-            "--location",
-            "--proto",
-            "=https",
-            "--proto-redir",
-            "=https",
-            "--max-filesize",
-            "134217728",
-            "--max-time",
-            "180",
-            "--url",
-            &url,
-            "--output",
-        ])
-        .arg(&archive)
-        .status()?
-        .success()
-        || digest(&archive)? != pin
-    {
-        return Err("upstream source download or checksum failed".into());
+    download_pinned(&url, &pin, &archive)?;
+    // A reviewed license archive is needed when distributable source bytes are
+    // not themselves a tar archive (e.g. raw upstream executables).
+    let (license_archive, legal_root) = if let Some(license) = policy.get("license_archive") {
+        let path = sources.join(format!("{name}-{version}-license.tar"));
+        download_pinned(&text(license, "url")?, &text(license, "sha256")?, &path)?;
+        (path, text(license, "root")?)
+    } else {
+        (archive, format!("{name}-{version}"))
+    };
+    if !safe_component(&legal_root) {
+        return Err("unsafe license archive directory".into());
     }
     let legal = directory.join("licenses").join(format!("{name}-{version}"));
     fs::create_dir_all(&legal)?;
     for file in policy["license_files"]
         .as_array()
-        .filter(|files| !files.is_empty())
+        .filter(|files| !files.is_empty() && files.len() <= 64)
         .ok_or("missing upstream license files")?
     {
         let file = file.as_str().ok_or("invalid upstream license file")?;
-        if file.contains('/')
-            || !file
-                .bytes()
-                .all(|b| b.is_ascii_alphanumeric() || b"._-".contains(&b))
-        {
+        if file.contains('/') || !vex::safe_path(file) {
             return Err("unsafe license file path".into());
         }
-        let path = format!("{name}-{version}/{file}");
-        let result = Command::new("tar")
+        let path = format!("{legal_root}/{file}");
+        let mut child = Command::new("tar")
             .arg("-xOf")
-            .arg(&archive)
+            .arg(&license_archive)
             .arg("--")
             .arg(&path)
-            .output()?;
-        if !result.status.success()
-            || result.stdout.is_empty()
-            || result.stdout.len() > 4 * 1024 * 1024
-        {
+            .stdout(Stdio::piped())
+            .spawn()?;
+        let mut bytes = Vec::new();
+        let read = child
+            .stdout
+            .take()
+            .ok_or("missing tar stdout")?
+            .take(4 * 1024 * 1024 + 1)
+            .read_to_end(&mut bytes);
+        if read.is_err() || bytes.len() > 4 * 1024 * 1024 {
+            let _ = child.kill();
+        }
+        let status = child.wait()?;
+        if read.is_err() || !status.success() || bytes.is_empty() || bytes.len() > 4 * 1024 * 1024 {
             return Err(format!(
                 "upstream license {path} missing, empty or oversized in pinned archive"
             )
             .into());
         }
-        fs::write(legal.join(file), result.stdout)?;
+        fs::write(legal.join(file), bytes)?;
     }
     let mut result = package(
         &format!("SPDXRef-Upstream-{index}"),
@@ -320,13 +381,48 @@ fn upstream(directory: &Path, policy: &Value, index: usize) -> Result<Value> {
             )?;
         }
         result["sourceInfo"] = json!(
-            "Upstream archive plus exact reviewed patches retained under sources/; see vex-policy.json for catalog and source bindings."
+            "Upstream archive plus exact reviewed patches retained under sources/; see vex-policy.json for recipe and source bindings."
         );
     }
     if let Some(cpe) = policy["cpe"].as_str() {
         result["externalRefs"].as_array_mut().ok_or("invalid SPDX references")?.push(json!({"referenceCategory":"SECURITY","referenceType":"cpe23Type","referenceLocator":cpe}));
     }
     Ok(result)
+}
+
+fn download_pinned(url: &str, pin: &str, archive: &Path) -> Result {
+    if !url.starts_with("https://") || url.contains(['\n', '\r', '\0']) {
+        return Err("unsafe upstream source URL".into());
+    }
+    if !hex_pin(pin) {
+        return Err("invalid upstream SHA-256 pin".into());
+    }
+    if !Command::new("curl")
+        .args([
+            "--fail",
+            "--silent",
+            "--show-error",
+            "--location",
+            "--proto",
+            "=https",
+            "--proto-redir",
+            "=https",
+            "--max-filesize",
+            "134217728",
+            "--max-time",
+            "180",
+            "--url",
+            url,
+            "--output",
+        ])
+        .arg(archive)
+        .status()?
+        .success()
+        || digest(archive)? != pin
+    {
+        return Err("upstream source download or checksum failed".into());
+    }
+    Ok(())
 }
 fn validate_sbom(document: &Value) -> Result {
     if document["spdxVersion"] != "SPDX-2.3" {
@@ -378,15 +474,33 @@ fn validate_sbom(document: &Value) -> Result {
     }
     Ok(())
 }
-fn scan(directory: &Path) -> Result {
+fn scan(directory: &Path, gnu: bool, scanner: &Path) -> Result<Option<vex::Assessment>> {
     let sbom = directory.join("sbom.spdx.json");
     validate_sbom(&read(&sbom)?)?;
     let report = directory.join("grype.json");
-    let assessment = vex::prepare(directory)?;
-    let status = Command::new("grype")
-        .arg(format!("sbom:{}", sbom.display()))
-        .arg("--vex")
-        .arg(&assessment.document)
+    let assessment = gnu.then(|| vex::prepare(directory)).transpose()?;
+    // Use a known config rather than settings in the caller's home or checkout.
+    // In particular an ambient DB URL or report filter is not release policy.
+    let configuration = tempfile::Builder::new().suffix(".yaml").tempfile()?;
+    fs::write(
+        configuration.path(),
+        "db:\n  validate-by-hash-on-start: true\n  validate-age: true\n",
+    )?;
+    let mut command = Command::new(scanner);
+    for (key, _) in std::env::vars_os() {
+        if key
+            .to_str()
+            .is_some_and(|key| key.starts_with("GRYPE_") || key.starts_with("SYFT_"))
+        {
+            command.env_remove(key);
+        }
+    }
+    command.arg("--config").arg(configuration.path());
+    command.arg(format!("sbom:{}", sbom.display()));
+    if let Some(ref assessment) = assessment {
+        command.arg("--vex").arg(&assessment.document);
+    }
+    let status = command
         .args(["--fail-on", "high", "--output", "json", "--file"])
         .arg(&report)
         .status()?;
@@ -398,8 +512,9 @@ fn scan(directory: &Path) -> Result {
     }
     let report = read(&report)?;
     validate_scan(&report)?;
-    vex::validate_ignored(&report, Some(&assessment))?;
-    checksums(directory)
+    evidence::database(&report)?;
+    vex::validate_ignored(&report, assessment.as_ref())?;
+    Ok(assessment)
 }
 fn validate_scan(report: &Value) -> Result {
     if !report["matches"].is_array() {
@@ -419,6 +534,14 @@ fn validate_scan(report: &Value) -> Result {
     Ok(())
 }
 pub(super) fn checksums(directory: &Path) -> Result {
+    let sums = checksum_text(directory)?;
+    let mut staged = tempfile::NamedTempFile::new_in(directory)?;
+    staged.write_all(sums.as_bytes())?;
+    staged.persist(directory.join("SHA256SUMS"))?;
+    Ok(())
+}
+
+fn checksum_text(directory: &Path) -> Result<String> {
     fn visit(base: &Path, relative: &Path, result: &mut Vec<(String, String)>) -> Result {
         for entry in fs::read_dir(base.join(relative))? {
             let entry = entry?;
@@ -442,8 +565,7 @@ pub(super) fn checksums(directory: &Path) -> Result {
     for (name, digest) in files {
         writeln!(&mut text, "{digest}  {name}")?;
     }
-    fs::write(directory.join("SHA256SUMS"), text)?;
-    Ok(())
+    Ok(text)
 }
 #[cfg(test)]
 mod tests {

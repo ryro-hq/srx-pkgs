@@ -1,9 +1,9 @@
 {
-  "schema": 1,
+  "schema": 2,
   "expires": "2026-11-20",
   "document": "security/vex/glibc-2.44.openvex.json",
   "document_sha256": "7a4a80a23e3d5b91334c7c3116a90736f0f768d5c8241a938d84ab9afe0c9693",
-  "catalog_lock_sha256": "b89d3b3d8b21483a1e704bc198dbfeb23e0069b049f33c10ea2bc6393042f5f4",
+  "recipe_sha256": "61d78ae042f7bfddee4ca5e9f4fa06893a9e38b143175a89a7a3a8d9991b4e0a",
   "source_sha256": "37f600f2bef3c5e8300147059568b2a2e40a7ad6ccc65ce942556d49429cc667",
   "purl": "pkg:generic/glibc@2.44?patches=0eee10d275c28263a17fb5639977a71f7b0807e264f214da8ebe9ecaa9ddb429",
   "patches": [
