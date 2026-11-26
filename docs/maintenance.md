@@ -90,6 +90,18 @@ database change. A failed scan can leave an `INCOMPLETE` directory with
 diagnostics; it is not passing evidence and must not be published. These
 commands are not a substitute for both VM runs or signed release attestation.
 
+Review the exact versions in `security/runtime-dependencies.json`. The site of
+the build or its target ABI does not identify linked components. The runtime
+roles must match the loader/library outputs in the imported and checked bundle;
+license and source policy identifies each output's reviewed component. Static
+components are explicitly declared from the reviewed recipe and checked against
+the qualification host inventory; they are not inferred from an ELF header.
+For a prebuilt binary, review upstream static/vendored dependencies rather than
+assuming a missing loader means there are no dependencies. A new or modified
+recipe needs dependency review before producing release evidence. Use
+`cargo xtask security dependency-scopes` to print the recipe fingerprints for
+review. The evidence retains the output digests and SPDX link relationships.
+
 ## Retire
 
 Identify consumers, describe the migration and date, and choose a replacement

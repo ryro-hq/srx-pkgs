@@ -4,16 +4,25 @@ use serde_json::{Value, json};
 use sha2::{Digest as _, Sha256};
 use std::fmt::Write as _;
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeMap, BTreeSet},
     fs,
     io::{Read as _, Write as _},
     path::Path,
     process::{Command, Stdio},
 };
+mod dependencies;
 mod evidence;
 mod vex;
 
 pub(super) use evidence::execute as package_evidence;
+
+pub(super) fn dependency_scopes() -> Result {
+    dependencies::scopes()
+}
+
+pub(super) fn check_dependency_profiles() -> Result {
+    dependencies::check_profiles()
+}
 
 pub(super) fn vex_status(required: bool) -> Result {
     vex::status(required)
@@ -128,6 +137,7 @@ fn inventory(
     selection: Option<&evidence::Selection<'_>>,
 ) -> Result<(bool, Vec<Value>)> {
     let policy = read(Path::new("security/package-licenses.json"))?;
+    let dependency_policy = read(Path::new("security/runtime-dependencies.json"))?;
     let lock = read(Path::new("Catalog.lock"))?;
     if manifest["catalog_lock_sha256"] != digest(Path::new("Catalog.lock"))?
         || manifest["project_lock_sha256"] != digest(Path::new("Syrox.lock"))?
@@ -138,9 +148,11 @@ fn inventory(
     let commit = commit.trim();
     let mut packages = Vec::new();
     let mut relations = Vec::new();
-    let mut seen = BTreeSet::new();
-    let mut gnu = false;
-    let mut musl = false;
+    let mut spdx_ids: BTreeMap<String, String> = BTreeMap::new();
+    let mut source_inventory = BTreeMap::new();
+    let mut dependencies = BTreeSet::new();
+    let mut use_glibc_vex = false;
+    let mut runtime_inventory = Vec::new();
     let mut qualified = Vec::new();
     for report in manifest["packages"]
         .as_array()
@@ -167,83 +179,110 @@ fn inventory(
         if selection.is_some_and(|selection| !selection.matches(&locked["package"])) {
             continue;
         }
-        if report["system"] == "linux-x86_64-gnu" {
-            gnu = true;
-        } else if report["system"] == "linux-x86_64-musl" {
-            musl = true;
-        } else {
-            return Err("unreviewed release ABI".into());
-        }
         let bundle = input.join(format!("{identity}.bundle"));
         if report["bundle_sha256"] != digest(&bundle)? {
             return Err("release bundle changed after qualification".into());
         }
         qualified.push(report.clone());
-        if seen.insert(format!("{name}@{version}")) {
-            let pin = policy["packages"]
-                .as_array()
-                .ok_or("missing native package policy")?
-                .iter()
-                .find(|entry| entry["name"] == name && entry["version"] == version)
-                .ok_or("package lacks reviewed source/license policy")?;
-            if pin["sha256"] != locked["package"]["source_sha256"]
-                || pin["url"] != locked["package"]["source_url"]
-            {
-                return Err("license policy differs from qualified source".into());
-            }
-            packages.push(upstream(directory, pin, packages.len())?);
+        let pin = reviewed_component(&policy, &name, &version)?;
+        if pin["sha256"] != locked["package"]["source_sha256"]
+            || pin["url"] != locked["package"]["source_url"]
+        {
+            return Err("license policy differs from qualified source".into());
         }
+        // A version can have both a static and a dynamic build. Give each
+        // qualified application its own graph node, even if the source is shared.
+        let application = format!("SPDXRef-Application-{identity}");
+        let mut application_package = component_source(directory, pin, &mut source_inventory)?;
+        let context = format!(
+            "Qualified combination {identity}; variant {}; target {}; bundle SHA256 {}.",
+            text(&locked["package"], "variant")?,
+            text(&locked["package"], "system")?,
+            text(report, "bundle_sha256")?
+        );
+        application_package["sourceInfo"] = match application_package["sourceInfo"].as_str() {
+            Some(existing) => json!(format!("{existing} {context}")),
+            None => json!(context),
+        };
+        application_package["SPDXID"] = json!(application);
+        packages.push(application_package);
+        let declarations = dependencies::resolve(
+            &dependency_policy,
+            locked,
+            dependencies::verified_outputs(&bundle, report)?,
+        )?;
+        let mut roles = Vec::new();
+        for (role, (component, output)) in declarations.runtime {
+            let (name, version) = component
+                .split_once('@')
+                .ok_or("missing component version")?;
+            let pin = reviewed_component(&policy, name, version)?;
+            let source = text(pin, "recipe_source")?;
+            if !source.starts_with("recipes/packages/")
+                || !vex::safe_path(&source)
+                || locked["inputs"][&source] != digest(Path::new(&source))?
+            {
+                return Err(
+                    "runtime source recipe is not bound to the qualified combination".into(),
+                );
+            }
+            let recipe = fs::read_to_string(&source)?;
+            if !recipe.contains(&format!("\"{}\"", text(pin, "sha256")?))
+                || !recipe.contains(&format!("\"{}\"", text(pin, "url")?))
+            {
+                return Err("runtime recipe differs from reviewed license source".into());
+            }
+            use_glibc_vex |= name == "glibc" && pin["role"] == "gnu-runtime";
+            let spdx = match spdx_ids.get(&component) {
+                Some(id) => id.clone(),
+                None => {
+                    let mut dependency = component_source(directory, pin, &mut source_inventory)?;
+                    let id = format!("SPDXRef-Upstream-{}", packages.len());
+                    dependency["SPDXID"] = json!(id);
+                    packages.push(dependency);
+                    spdx_ids.insert(component.clone(), id.clone());
+                    id
+                }
+            };
+            dependencies.insert((application.clone(), "DYNAMIC_LINK", spdx));
+            roles.push(
+                json!({"role":role,"component":component,"action":output.action,
+                "output":output.name,"artifact":output.artifact}),
+            );
+        }
+        let mut static_components = Vec::new();
+        for name in declarations.static_host {
+            let static_runtime = musl_runtime(input, directory, &identity)?;
+            let id = format!("{}@{}", name, text(&static_runtime, "versionInfo")?);
+            let spdx = match spdx_ids.get(&id) {
+                Some(existing) => existing.clone(),
+                None => {
+                    let mut runtime = static_runtime;
+                    let spdx = format!("SPDXRef-Upstream-{}", packages.len());
+                    runtime["SPDXID"] = json!(spdx);
+                    packages.push(runtime);
+                    spdx_ids.insert(id.clone(), spdx.clone());
+                    spdx
+                }
+            };
+            dependencies.insert((application.clone(), "STATIC_LINK", spdx));
+            static_components.push(id);
+        }
+        runtime_inventory.push(json!({"identity":identity,"manifest":report["manifest"],
+            "bundle_sha256":report["bundle_sha256"],"runtime":roles,"static_host":static_components}));
     }
     if qualified.is_empty() || (selection.is_some() && qualified.len() != 1) {
         return Err("no unique qualified package/version/variant/system matches".into());
     }
-    if gnu {
-        let libc = policy["packages"]
-            .as_array()
-            .ok_or("missing package license policy")?
-            .iter()
-            .find(|entry| entry["role"] == "gnu-runtime")
-            .ok_or("missing GNU runtime license/source policy")?;
-        let source = fs::read_to_string(text(libc, "recipe_source")?)?;
-        if !source.contains(&format!("\"{}\"", text(libc, "sha256")?))
-            || !source.contains(&format!("\"{}\"", text(libc, "url")?))
-        {
-            return Err("runtime source differs from reviewed license policy".into());
+    for (application, kind, dependency) in dependencies {
+        if application != dependency {
+            relations.push(relation(&application, kind, &dependency));
         }
-        packages.push(upstream(directory, libc, packages.len())?);
     }
-    if musl {
-        let host = read(&input.join("host-debian.json"))?;
-        let sbom_path = input.join("host-debian.spdx.json");
-        if host["sbom_sha256"] != digest(&sbom_path)? {
-            return Err("host SBOM differs from its bound qualification environment".into());
-        }
-        let host_sbom = read(&sbom_path)?;
-        let runtime = host_sbom["packages"]
-            .as_array()
-            .ok_or("missing host package inventory")?
-            .iter()
-            .find(|package| package["name"] == "musl-dev")
-            .ok_or("actual musl development/runtime version is unknown")?;
-        let mut runtime = runtime.clone();
-        runtime["SPDXID"] = json!(format!("SPDXRef-Upstream-{}", packages.len()));
-        runtime["licenseDeclared"] = json!("MIT");
-        runtime["licenseConcluded"] = json!("MIT");
-        if !runtime["externalRefs"].as_array().is_some_and(|refs| {
-            refs.iter()
-                .any(|reference| reference["referenceType"] == "purl")
-        }) {
-            return Err("musl SBOM lacks package identity for vulnerability matching".into());
-        }
-        packages.push(runtime);
-        let license_path = input.join("musl-debian.copyright");
-        if host["musl_copyright_sha256"] != digest(&license_path)? {
-            return Err("musl copyright differs from the qualified guest".into());
-        }
-        let license = fs::read(license_path)?;
-        fs::create_dir_all(directory.join("licenses"))?;
-        fs::write(directory.join("licenses/musl-MIT.txt"), license)?;
-    }
+    encode(
+        &directory.join("runtime-dependencies.json"),
+        &json!({"schema":1,"packages":runtime_inventory}),
+    )?;
     for package in &packages {
         relations.push(relation(
             "SPDXRef-DOCUMENT",
@@ -266,10 +305,84 @@ fn inventory(
         ),
     )?;
     if selection.is_none() {
-        scan(directory, gnu, Path::new("grype"))?;
+        scan(directory, use_glibc_vex, Path::new("grype"))?;
         checksums(directory)?;
     }
-    Ok((gnu, qualified))
+    Ok((use_glibc_vex, qualified))
+}
+
+fn reviewed_component<'a>(policy: &'a Value, name: &str, version: &str) -> Result<&'a Value> {
+    let mut entries = policy["packages"]
+        .as_array()
+        .ok_or("missing native package policy")?
+        .iter()
+        .filter(|entry| entry["name"] == name && entry["version"] == version);
+    let pin = entries
+        .next()
+        .ok_or_else(|| format!("{name}@{version} lacks reviewed source/license policy"))?;
+    if entries.next().is_some() {
+        return Err(format!("{name}@{version} has conflicting source/license policy").into());
+    }
+    Ok(pin)
+}
+
+fn component_source(
+    directory: &Path,
+    pin: &Value,
+    inventory: &mut BTreeMap<String, Value>,
+) -> Result<Value> {
+    let key = format!("{}@{}", text(pin, "name")?, text(pin, "version")?);
+    if let Some(package) = inventory.get(&key) {
+        return Ok(package.clone());
+    }
+    let package = upstream(directory, pin)?;
+    inventory.insert(key, package.clone());
+    Ok(package)
+}
+
+fn musl_runtime(input: &Path, directory: &Path, identity: &str) -> Result<Value> {
+    let host = read(&input.join("host-debian.json"))?;
+    let vm = read(&input.join(format!("{identity}.debian.vm.json")))?;
+    if host["canonical"] != true
+        || vm["identity"] != identity
+        || vm["status"] != "passed"
+        || vm["vm_cleanup"] != "destroyed"
+        || ["image_archive_sha256", "runtime_sha256", "firmware_sha256"]
+            .into_iter()
+            .any(|key| {
+                !host[key].as_str().is_some_and(hex_pin) || vm["environment"][key] != host[key]
+            })
+    {
+        return Err("static component host did not produce the qualified combination".into());
+    }
+    let sbom_path = input.join("host-debian.spdx.json");
+    if host["sbom_sha256"] != digest(&sbom_path)? {
+        return Err("host SBOM differs from its bound qualification environment".into());
+    }
+    let host_sbom = read(&sbom_path)?;
+    let runtime = host_sbom["packages"]
+        .as_array()
+        .ok_or("missing host package inventory")?
+        .iter()
+        .find(|package| package["name"] == "musl-dev")
+        .ok_or("actual musl development/runtime version is unknown")?;
+    let mut runtime = runtime.clone();
+    runtime["licenseDeclared"] = json!("MIT");
+    runtime["licenseConcluded"] = json!("MIT");
+    if !runtime["externalRefs"].as_array().is_some_and(|refs| {
+        refs.iter()
+            .any(|reference| reference["referenceType"] == "purl")
+    }) {
+        return Err("musl SBOM lacks package identity for vulnerability matching".into());
+    }
+    let license_path = input.join("musl-debian.copyright");
+    if host["musl_copyright_sha256"] != digest(&license_path)? {
+        return Err("musl copyright differs from the qualified guest".into());
+    }
+    let license = fs::read(license_path)?;
+    fs::create_dir_all(directory.join("licenses"))?;
+    fs::write(directory.join("licenses/musl-MIT.txt"), license)?;
+    Ok(runtime)
 }
 
 fn hex_pin(text: &str) -> bool {
@@ -278,7 +391,7 @@ fn hex_pin(text: &str) -> bool {
             .bytes()
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
-fn upstream(directory: &Path, policy: &Value, index: usize) -> Result<Value> {
+fn upstream(directory: &Path, policy: &Value) -> Result<Value> {
     let name = text(policy, "name")?;
     let version = text(policy, "version")?;
     let url = text(policy, "url")?;
@@ -349,7 +462,7 @@ fn upstream(directory: &Path, policy: &Value, index: usize) -> Result<Value> {
         fs::write(legal.join(file), bytes)?;
     }
     let mut result = package(
-        &format!("SPDXRef-Upstream-{index}"),
+        "SPDXRef-Source",
         &name,
         &version,
         &text(policy, "license")?,
@@ -474,11 +587,11 @@ fn validate_sbom(document: &Value) -> Result {
     }
     Ok(())
 }
-fn scan(directory: &Path, gnu: bool, scanner: &Path) -> Result<Option<vex::Assessment>> {
+fn scan(directory: &Path, use_glibc_vex: bool, scanner: &Path) -> Result<Option<vex::Assessment>> {
     let sbom = directory.join("sbom.spdx.json");
     validate_sbom(&read(&sbom)?)?;
     let report = directory.join("grype.json");
-    let assessment = gnu.then(|| vex::prepare(directory)).transpose()?;
+    let assessment = use_glibc_vex.then(|| vex::prepare(directory)).transpose()?;
     // Use a known config rather than settings in the caller's home or checkout.
     // In particular an ambient DB URL or report filter is not release policy.
     let configuration = tempfile::Builder::new().suffix(".yaml").tempfile()?;

@@ -71,11 +71,11 @@ pub(crate) fn execute(args: &[&str]) -> Result {
         ])?
     );
     let manifest = read(&manifest_path)?;
-    let (gnu, reports) = inventory(&input, &output, &manifest, Some(&selection))?;
+    let (use_glibc_vex, reports) = inventory(&input, &output, &manifest, Some(&selection))?;
     let tools = work.path().join("tools");
     crate::policy::tools(&tools, "grype")?;
     let scanner = tools.join("grype");
-    let assessed = match scan(&output, gnu, &scanner) {
+    let assessed = match scan(&output, use_glibc_vex, &scanner) {
         Ok(assessed) => assessed,
         Err(error) => {
             if *mode == "generate" {

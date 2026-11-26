@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "profiles": [
+    {
+      "name": "hello", "versions": ["2.12.1"], "variant": "default", "system": "linux-x86_64-gnu",
+      "recipe_sha256": "b044afe518f1771387ad13e2e25d457c3427c061c9af343954b4a1f657dd4bd2",
+      "runtime": {"loader": "glibc@2.44", "library_0": "glibc@2.44"},
+      "static_host": []
+    },
+    {
+      "name": "hello", "versions": ["2.12.1"], "variant": "default", "system": "linux-x86_64-musl",
+      "recipe_sha256": "10c0318d75ef5b732b99cb8351f88234f69b40e7fca87afd22da68040d2f7528",
+      "runtime": {},
+      "static_host": ["musl-dev"]
+    },
+    {
+      "name": "nginx", "versions": ["1.30.5", "1.30.6"], "variant": "minimal", "system": "linux-x86_64-gnu",
+      "recipe_sha256": "fbab2d44334a2235472fdaf895c8f5a5391577d99032f40d7a49941f56216fbf",
+      "runtime": {"loader": "glibc@2.44", "library_0": "glibc@2.44"},
+      "static_host": []
+    },
+    {
+      "name": "nginx", "versions": ["1.30.5", "1.30.6"], "variant": "minimal", "system": "linux-x86_64-musl",
+      "recipe_sha256": "f816099b1d85a23dc3c067a9dfce4972f503b8bd39f93e104cd7e7ce7fe1b9b1",
+      "runtime": {},
+      "static_host": ["musl-dev"]
+    }
+  ]
+}

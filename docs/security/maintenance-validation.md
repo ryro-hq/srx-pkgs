@@ -11,3 +11,23 @@ repository settings or releases. They are not release approval.
 | Per-package evidence | Re-imported bundles from [run 39555337165](https://github.com/ryro-hq/srx-pkgs/actions/runs/39555337165) offline using the pinned core; the resulting manifest was byte-identical. Per-package evidence for Hello 2.12.1 musl generated licenses/SPDX and retained a real Grype report from the 2026-11-26 database. One high finding correctly blocked it, and `check` refused the incomplete output. | Review the finding and qualify with the current accepted runtime. Positive check/evidence comparisons are covered with fixtures; no passing live result is claimed from this scan. |
 | Immutable publication | The historical job log showed HTTP 403 on the first immutable-settings request. The regression exercises missing credentials, 403, 404, malformed/disabled responses and enabled settings. | Configure the read-only Administration credential and publish/verify a new immutable release, including byte and offline-import checks of the actual published payload. |
 | Measurement | The [maintenance guide](../maintenance.md#measure-authoring-effort) records controlled before/after local plan timings. | Measure human author time and CI wait on a representative qualified package. |
+
+## Dependency inventory and candidate repin
+
+The SBOM now gives each qualified combination its own application node. It
+checks the reviewed provider roles against the bundle imported under its exact
+manifest pin, and retains the corresponding output digests. Static host
+components require an explicit recipe review and guest inventory; a target
+label alone does not add a component or activate VEX.
+
+An isolated checkout pinned SRX PR #62 at `9a7bab5`, regenerated both locks and
+verified that all previous version identities remained pinned. The portable
+suite exercised the four extended scaffolds with the candidate. The catalog
+branch does not pin the still-unmerged PR commit.
+
+Native Hello 2.12.1/musl qualification with the new pin was attempted but did
+not produce fresh evidence: host `setpriv` 2.41.3 rejected the required Landlock
+access list, and this account could not open `/dev/kvm` read/write for the
+pinned guest. No isolation control was disabled. Run the native matrix in the
+catalog CI after the core revision is integrated; portable checks and
+inspection of historical bundles are not a substitute.
