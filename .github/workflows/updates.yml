@@ -3,6 +3,13 @@ on:
   schedule:
     - cron: '17 7 * * *'
   workflow_dispatch:
+    inputs:
+      package:
+        description: 'Optional exact package for read-only observation'
+        type: string
+      version:
+        description: 'Optional exact version for read-only observation'
+        type: string
 permissions:
   contents: read
 concurrency:
@@ -10,11 +17,12 @@ concurrency:
   cancel-in-progress: false
 jobs:
   prepare:
-    # Enabling requires an installed, narrowly scoped App and its own DCO identity.
-    if: vars.CATALOG_UPDATER_ENABLED == 'true' && vars.CATALOG_UPDATER_APP_ID != ''
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     outputs:
       updates: ${{ steps.prepare.outputs.updates }}
+      failures: ${{ steps.prepare.outputs.failures }}
+      propose: ${{ steps.mode.outputs.propose }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -27,41 +35,87 @@ jobs:
         run: docker build -f .github/maintenance.Containerfile -t syrox-maintenance:ci .github
       - name: Discover and verify sources without write credentials
         id: prepare
+        env:
+          CATALOG_UPDATE_CONTAINER: 'true'
+          PACKAGE: ${{ inputs.package }}
+          VERSION: ${{ inputs.version }}
         run: |
-          docker run --rm --user "$(id -u):$(id -g)" --dns-option single-request \
-            --mount "type=bind,src=$PWD,dst=/catalog,readonly" \
-            syrox-maintenance:ci /catalog/.core/target/catalog-candidate/srx catalog updates /catalog > /tmp/updates.json
-          mkdir -p /tmp/prepared-updates
-          jq -n '[]' > /tmp/prepared-updates/index.json
-          original=$(git rev-parse HEAD)
-          while IFS=$'\t' read -r name version; do
-            [[ "$name" =~ ^[a-z][a-z0-9_]*$ ]]
-            [[ "$version" =~ ^[0-9]+(\.[0-9]+)+$ ]]
-            git reset --hard "$original"
-            git clean -fd -- changes
-            docker run --rm --user "$(id -u):$(id -g)" --dns-option single-request \
-              --mount "type=bind,src=$PWD,dst=/catalog" \
-              syrox-maintenance:ci /catalog/.core/target/catalog-candidate/srx catalog add /catalog "$name" "$version"
-            srx catalog generate . --check
-            srx catalog check .
-            srx catalog lock . --check
-            git add catalog.toml Catalog.lock Syrox.lock recipes changes
-            git diff --cached --binary --full-index > "/tmp/prepared-updates/$name-$version.patch"
-            pin=$(sha256sum "/tmp/prepared-updates/$name-$version.patch" | cut -d' ' -f1)
-            jq --arg name "$name" --arg version "$version" --arg pin "$pin" \
-              '. + [{name:$name,version:$version,sha256:$pin}]' /tmp/prepared-updates/index.json > /tmp/index.new
-            mv /tmp/index.new /tmp/prepared-updates/index.json
-          done < <(jq -r '.[] | @tsv' /tmp/updates.json)
-          echo "updates=$(jq -c . /tmp/prepared-updates/index.json)" >> "$GITHUB_OUTPUT"
+          args=()
+          if [[ -n "$PACKAGE" || -n "$VERSION" ]]; then args=("$PACKAGE" "$VERSION"); fi
+          bash .github/scripts/prepare-updates.sh "$RUNNER_TEMP/prepared-updates" "${args[@]}"
+          echo "updates=$(jq -c . "$RUNNER_TEMP/prepared-updates/index.json")" >> "$GITHUB_OUTPUT"
+          echo "failures=$(jq -c . "$RUNNER_TEMP/prepared-updates/failures.json")" >> "$GITHUB_OUTPUT"
+      - name: Explain whether the verified candidates can be proposed
+        id: mode
+        env:
+          ENABLED: ${{ vars.CATALOG_UPDATER_ENABLED }}
+          APP_ID: ${{ vars.CATALOG_UPDATER_APP_ID }}
+          FORK: ${{ vars.CATALOG_UPDATER_FORK }}
+          FORK_APP_ID: ${{ vars.CATALOG_UPDATER_FORK_APP_ID }}
+          UPDATES: ${{ steps.prepare.outputs.updates }}
+          FAILURES: ${{ steps.prepare.outputs.failures }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          propose=false
+          if [[ "$UPDATES" == '[]' && "$FAILURES" != '[]' ]]; then
+            reason='Candidates were found but none could be authenticated and prepared. See the channel failures.'
+          elif [[ "$UPDATES" == '[]' ]]; then
+            reason='No newer stable release on the configured signed channels.'
+          elif [[ "$GITHUB_EVENT_NAME" != schedule || "$GITHUB_REF" != refs/heads/main ]]; then
+            reason='Manual dispatch is observation only; signed pins and diffs were retained.'
+          elif [[ "$ENABLED" != true || -z "$APP_ID" || -z "$FORK_APP_ID" || -z "$FORK" ]]; then
+            reason='Observation only: enable CATALOG_UPDATER_ENABLED and configure both updater Apps and the proposal fork after rollout.'
+          else
+            [[ "$FORK" =~ ^[A-Za-z0-9-]+/[A-Za-z0-9_.-]+$ ]]
+            owner=${FORK%%/*}
+            [[ "${owner,,}" != "${GITHUB_REPOSITORY_OWNER,,}" && "$APP_ID" != "$FORK_APP_ID" ]]
+            gh api "repos/$FORK" --jq .parent.full_name > "$RUNNER_TEMP/proposal-parent"
+            [[ "$(cat "$RUNNER_TEMP/proposal-parent")" == "$GITHUB_REPOSITORY" ]]
+            gh api "repos/$GITHUB_REPOSITORY/rules/branches/main" > "$RUNNER_TEMP/main-rules.json"
+            gh api "repos/$GITHUB_REPOSITORY/releases/latest" > "$RUNNER_TEMP/latest-catalog-release.json"
+            if ! jq -e 'any(.[]; .type == "pull_request" and
+                .parameters.required_approving_review_count >= 1 and
+                .parameters.dismiss_stale_reviews_on_push == true) and
+                any(.[]; .type == "required_status_checks" and
+                  any(.parameters.required_status_checks[]; .context == "verify" or .context == "success")
+                  and any(.parameters.required_status_checks[]; .context == "DCO"))' \
+                "$RUNNER_TEMP/main-rules.json" >/dev/null; then
+              reason='Observation only: the protected branch must require human review and the catalog qualification gate.'
+            elif ! jq -e '.immutable == true and any(.assets[]; .name == "attestations.jsonl" and .state == "uploaded")' \
+                "$RUNNER_TEMP/latest-catalog-release.json" >/dev/null; then
+              reason='Observation only: first verify a repaired immutable catalog release (#6).'
+            else
+              propose=true
+              reason='Signed candidates prepared; the App may open PRs, not approve, merge or publish.'
+            fi
+          fi
+          printf '%s\n' "$reason" | tee -a "$GITHUB_STEP_SUMMARY"
+          printf 'propose=%s\n' "$propose" >> "$GITHUB_OUTPUT"
+      - name: Explain a failed preparation
+        if: failure()
+        run: echo 'Update discovery, authentication or validation failed. No proposal job can run; inspect the failed step.' >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: prepared-updates
-          path: /tmp/prepared-updates/*
+          path: ${{ runner.temp }}/prepared-updates/*
           if-no-files-found: error
+  channel-failures:
+    needs: prepare
+    if: needs.prepare.outputs.failures != '[]'
+    runs-on: ubuntu-24.04
+    steps:
+      - env:
+          FAILURES: ${{ needs.prepare.outputs.failures }}
+        run: |
+          echo 'Some upstream candidates failed authentication or preparation and will not be proposed:' >> "$GITHUB_STEP_SUMMARY"
+          jq -r '.[] | "- \(.name) \(.version)"' <<< "$FAILURES" >> "$GITHUB_STEP_SUMMARY"
+          exit 1
   propose:
     needs: prepare
-    if: needs.prepare.outputs.updates != '[]'
+    if: needs.prepare.outputs.propose == 'true' && needs.prepare.outputs.updates != '[]' && github.event_name == 'schedule' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: catalog-updater
     strategy:
       max-parallel: 1
       matrix:
@@ -76,18 +130,37 @@ jobs:
         with:
           name: prepared-updates
           path: /tmp/prepared-updates
+      - name: Resolve the dedicated proposal fork
+        id: fork
+        env:
+          FORK: ${{ vars.CATALOG_UPDATER_FORK }}
+        run: |
+          [[ "$FORK" =~ ^[A-Za-z0-9-]+/[A-Za-z0-9_.-]+$ ]]
+          owner=${FORK%%/*}
+          [[ "${owner,,}" != "${GITHUB_REPOSITORY_OWNER,,}" ]]
+          printf 'owner=%s\nrepo=%s\n' "$owner" "${FORK#*/}" >> "$GITHUB_OUTPUT"
       - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3
-        id: app
+        id: fork-app
+        with:
+          app-id: ${{ vars.CATALOG_UPDATER_FORK_APP_ID }}
+          private-key: ${{ secrets.CATALOG_UPDATER_FORK_APP_PRIVATE_KEY }}
+          owner: ${{ steps.fork.outputs.owner }}
+          repositories: ${{ steps.fork.outputs.repo }}
+          permission-contents: write
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3
+        id: base-app
         with:
           app-id: ${{ vars.CATALOG_UPDATER_APP_ID }}
           private-key: ${{ secrets.CATALOG_UPDATER_APP_PRIVATE_KEY }}
           repositories: srx-pkgs
-          permission-contents: write
           permission-pull-requests: write
       - name: Publish only reviewed patch paths; never execute prepared code
         env:
-          GH_TOKEN: ${{ steps.app.outputs.token }}
-          APP_SLUG: ${{ steps.app.outputs.app-slug }}
+          GH_TOKEN: ${{ steps.base-app.outputs.token }}
+          FORK_TOKEN: ${{ steps.fork-app.outputs.token }}
+          FORK_OWNER: ${{ steps.fork.outputs.owner }}
+          FORK_REPOSITORY: ${{ steps.fork.outputs.repo }}
+          APP_SLUG: ${{ steps.base-app.outputs.app-slug }}
           PACKAGE: ${{ matrix.update.name }}
           VERSION: ${{ matrix.update.version }}
           PATCH_SHA256: ${{ matrix.update.sha256 }}
@@ -100,20 +173,35 @@ jobs:
           test "$(sha256sum "$patch" | cut -d' ' -f1)" = "$PATCH_SHA256"
           git -c core.hooksPath=/dev/null apply --index --check "$patch"
           git -c core.hooksPath=/dev/null apply --index "$patch"
+          git diff --cached --name-only --no-renames -z > "$RUNNER_TEMP/update-paths"
           while IFS= read -r -d '' path; do
             case "$path" in
               catalog.toml|Catalog.lock|Syrox.lock|"recipes/packages/$PACKAGE/releases.srx"|"changes/$PACKAGE-$VERSION.json") ;;
               *) printf 'Refusing unexpected prepared path: %s\n' "$path" >&2; exit 1;;
             esac
-          done < <(git diff --cached --name-only -z)
+            [[ "$(git ls-files -s -- "$path")" == '100644 '* ]]
+          done < "$RUNNER_TEMP/update-paths"
+          branch="updates/$PACKAGE-$VERSION"
+          open_pr=$(gh api --method GET "repos/$GITHUB_REPOSITORY/pulls" -f state=open \
+            -f base=main -f head="$FORK_OWNER:$branch" --jq 'length')
+          if [[ "$open_pr" != 0 ]]; then
+            echo "Skipped $PACKAGE $VERSION: PR already open." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           bot_id=$(gh api "users/${APP_SLUG}[bot]" --jq .id)
           [[ "$bot_id" =~ ^[0-9]+$ ]]
           git config user.name "${APP_SLUG}[bot]"
           git config user.email "$bot_id+${APP_SLUG}[bot]@users.noreply.github.com"
           git -c core.hooksPath=/dev/null commit --signoff -m "build(catalog): add $PACKAGE $VERSION"
-          branch="updates/$PACKAGE-$VERSION"
-          gh auth setup-git
-          if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then exit 0; fi
-          git push origin "HEAD:refs/heads/$branch"
-          printf 'Adds %s %s from its pinned official signing authority. Defaults remain unchanged.\n\nVerification: signed source validation, typed catalog check, exact locks. Full native qualification and release gates remain required.\n' "$PACKAGE" "$VERSION" > /tmp/update-pr.txt
-          gh pr create --base main --head "$branch" --title "build(catalog): add $PACKAGE $VERSION" --body-file /tmp/update-pr.txt
+          git remote add proposal "https://github.com/$FORK_OWNER/$FORK_REPOSITORY.git"
+          GH_TOKEN="$FORK_TOKEN" gh auth setup-git
+          remote_ref=$(GH_TOKEN="$FORK_TOKEN" git ls-remote --heads proposal "refs/heads/$branch")
+          if [[ -n "$remote_ref" ]]; then
+            echo "Branch $branch exists without an open PR; inspect it manually. No force push or automatic reopening." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          GH_TOKEN="$FORK_TOKEN" git push proposal "HEAD:refs/heads/$branch"
+          body=$(printf 'Adds %s %s from its pinned official signing authority. Defaults remain unchanged.\n\nVerification: signed source validation, typed catalog check, exact locks. Human approval, full native qualification and release gates remain required.\n' "$PACKAGE" "$VERSION")
+          gh api --method POST "repos/$GITHUB_REPOSITORY/pulls" \
+            -f base=main -f head="$FORK_OWNER:$branch" \
+            -f title="build(catalog): add $PACKAGE $VERSION" -f body="$body" --jq .html_url
