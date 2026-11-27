@@ -3,7 +3,7 @@
   "expires": "2027-01-13",
   "document": "security/vex/glibc-2.44.openvex.json",
   "document_sha256": "a490579f2a86ae532aa68e7ffb00e3c01ab72d7b2f3776f903d86f30daef4264",
-  "recipe_sha256": "cd5d2c8488f72ce2f562058cd25fac1ea10cee5c8a042cbf9dedd70fbd0aa9da",
+  "recipe_sha256": "65756cb6c772734f74bc59da7ab6e109c477a4483b57fa95f857cf23311f8344",
   "source_sha256": "37f600f2bef3c5e8300147059568b2a2e40a7ad6ccc65ce942556d49429cc667",
   "purl": "pkg:generic/glibc@2.44?patches=e08a898067238ef4a73c77eaeabccc190e829cec0899502b324af5a16368ff00",
   "patches": [

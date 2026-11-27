@@ -141,6 +141,7 @@ impl Product {
         hash.update(b"srx-nginx-vex-recipe-v1\n");
         for path in [
             ".syrox-core",
+            ".github/catalog-guest.Containerfile",
             ".github/qualification-hosts.json",
             "recipes/packages/nginx/managed.srx",
         ] {

@@ -142,7 +142,7 @@ fn record(row: &Value, directory: &Path) -> Result {
     }
     let mut metadata = row.as_object().ok_or("invalid host row")?.clone();
     metadata.extend(json!({"schema":1,"scope":SCOPE,"kernel":provenance["kernel"],"sdk":provenance["sdk"],"image_id":image_id,
-        "image_archive_sha256":digest(&directory.join("image.tar"))?,"runtime_sha256":digest(&directory.join("msb"))?,"firmware_sha256":firmware, "sbom_sha256":digest(&directory.join("host.spdx.json"))?, "musl_copyright_sha256":digest(&directory.join("musl-copyright"))?}).as_object().ok_or("invalid metadata")?.clone());
+        "image_archive_sha256":digest(&directory.join("image.tar"))?,"runtime_sha256":digest(&directory.join("msb"))?,"firmware_sha256":firmware, "sbom_sha256":digest(&directory.join("host.spdx.json"))?, "os_release_sha256":digest(&directory.join("host-os-release"))?, "musl_copyright_sha256":digest(&directory.join("musl-copyright"))?}).as_object().ok_or("invalid metadata")?.clone());
     write(
         &directory.join(format!(
             "host-{}.json",
@@ -173,6 +173,10 @@ fn verified(row: &Value, directory: &Path) -> Result<Value> {
     let sbom = directory.join(format!("host-{host}.spdx.json"));
     if metadata["sbom_sha256"] != digest(&sbom)? {
         return Err("qualification host SBOM changed".into());
+    }
+    if metadata["os_release_sha256"] != digest(&directory.join(format!("host-{host}.os-release")))?
+    {
+        return Err("qualification guest os-release changed".into());
     }
     if metadata["musl_copyright_sha256"]
         != digest(&directory.join(format!("musl-{host}.copyright")))?
@@ -293,9 +297,11 @@ mod tests {
         let row = &config()["include"][0];
         let id = "c".repeat(64);
         fs::write(dir.join("host-debian.spdx.json"), b"{\"packages\":[]}").unwrap();
+        fs::write(dir.join("host-debian.os-release"), b"ID=debian\n").unwrap();
         fs::write(dir.join("musl-debian.copyright"), b"upstream notices").unwrap();
         let metadata = json!({"sbom_sha256":digest(&dir.join("host-debian.spdx.json")).unwrap(),"host":"debian","base_image":row["base_image"],"canonical":true,"schema":1,"kernel":"6.12.109","sdk":"0.7.3","image_archive_sha256":"a".repeat(64),"runtime_sha256":"b".repeat(64),"firmware_sha256":"d".repeat(64)});
         let mut metadata = metadata;
+        metadata["os_release_sha256"] = json!(digest(&dir.join("host-debian.os-release")).unwrap());
         metadata["musl_copyright_sha256"] =
             json!(digest(&dir.join("musl-debian.copyright")).unwrap());
         write(&dir.join("host-debian.json"), &metadata).unwrap();
@@ -314,6 +320,9 @@ mod tests {
         fs::write(dir.join("musl-debian.copyright"), b"changed notices").unwrap();
         assert!(verified(row, dir).is_err());
         fs::write(dir.join("musl-debian.copyright"), b"upstream notices").unwrap();
+        fs::write(dir.join("host-debian.os-release"), b"ID=other\n").unwrap();
+        assert!(verified(row, dir).is_err());
+        fs::write(dir.join("host-debian.os-release"), b"ID=debian\n").unwrap();
         for (pointer, value) in [
             ("/vm_cleanup", "unknown"),
             ("/status", "failed"),

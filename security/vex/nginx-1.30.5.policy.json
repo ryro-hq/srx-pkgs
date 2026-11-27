@@ -3,7 +3,7 @@
   "expires": "2027-01-13",
   "document": "security/vex/nginx-1.30.5.openvex.json",
   "document_sha256": "ff68b8464a54a558313441d988ea228bbb1fdd33ea5eed2b018ba5abc4aae516",
-  "recipe_sha256": "a9273af12f23a32088bfa846662875cde7bc2dc8ccd91c0d90987c0221ff8737",
+  "recipe_sha256": "53c775803daf7865afd9d894fdfd378e03d7ffea1497c19fd1cef21cb92c36a7",
   "source_sha256": "6c20565aa2325cb82216ae804f4a4ff1875179014759a381c42ddc8e11c4906d",
   "purl": "pkg:generic/nginx@1.30.5?patches=1e3e9f5c9a683a19528431c4c537e4ca3553ddadd9a1d38db1e135702f08e7cb",
   "patches": [

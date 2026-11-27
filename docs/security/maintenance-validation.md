@@ -67,6 +67,8 @@ It also found independent blocking matches:
   (High). Debian lists a fix in its newer `1.2.6-2` source package, not in the
   pinned stable guest's version.
 
-These findings are not covered by the new glibc assessment. Qualify fixed
-artifacts and rerun the complete gate; this scan is not a passing release
-result or evidence for the updated runtime.
+These findings are not covered by the new glibc assessment. The candidate
+[nginx backports](nginx.md) retain both old selectors, and the
+[canonical musl update](musl.md) admits the fixed Debian package. Standalone
+builds and scanner compatibility checks do not qualify the new bundles.
+Run the full native matrix and release gate before publishing.

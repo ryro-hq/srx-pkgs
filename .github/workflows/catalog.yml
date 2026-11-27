@@ -149,10 +149,12 @@ jobs:
           cp target/vm-runtime/landlock/{libkrunfw.so.5.6.1,provenance.json} ../.environment/
           (cd .. && cargo xtask security tools --output "$RUNNER_TEMP/srx-tools" --tool syft)
           "$RUNNER_TEMP/srx-tools/syft" scan docker-archive:../.environment/image.tar -o spdx-json=../.environment/host.spdx.json
+          docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges --user 65534:65534 \
+            --entrypoint /usr/bin/cat "$(cat ../.environment/image.id)" /etc/os-release > ../.environment/host-os-release
           docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges --user 65534:65534             --entrypoint /usr/bin/cat "$(cat ../.environment/image.id)" /usr/share/doc/musl/copyright > ../.environment/musl-copyright
           (cd .. && cargo xtask qualification record "$QUALIFICATION_HOST" .environment)
           cd ../.environment
-          sha256sum image.tar image.id msb libkrunfw.so.5.6.1 provenance.json "host-$QUALIFICATION_HOST.json" host.spdx.json musl-copyright > SHA256SUMS
+          sha256sum image.tar image.id msb libkrunfw.so.5.6.1 provenance.json "host-$QUALIFICATION_HOST.json" host.spdx.json host-os-release musl-copyright > SHA256SUMS
       - name: Release the bounded image builder
         if: always() && steps.vm-cache.outputs.cache-hit != 'true'
         run: docker buildx rm --force catalog-environment
@@ -179,6 +181,7 @@ jobs:
           path: |
             .environment/host-${{ matrix.host }}.json
             .environment/host.spdx.json
+            .environment/host-os-release
             .environment/musl-copyright
           include-hidden-files: true
           if-no-files-found: error
@@ -273,6 +276,7 @@ jobs:
           QUALIFICATION_HOST: ${{ matrix.host }}
         run: |
           mv .release/host.spdx.json ".release/host-$QUALIFICATION_HOST.spdx.json"
+          mv .release/host-os-release ".release/host-$QUALIFICATION_HOST.os-release"
           mv .release/musl-copyright ".release/musl-$QUALIFICATION_HOST.copyright"
       - name: Require every combination and bind it to this guest environment
         env:
@@ -295,6 +299,7 @@ jobs:
             .release/qualification-${{ matrix.host }}.json
             .release/host-${{ matrix.host }}.json
             .release/host-${{ matrix.host }}.spdx.json
+            .release/host-${{ matrix.host }}.os-release
             .release/musl-${{ matrix.host }}.copyright
             .release/*.${{ matrix.host }}.vm.json
           include-hidden-files: true

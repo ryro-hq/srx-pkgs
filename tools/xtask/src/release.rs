@@ -347,8 +347,18 @@ fn component_source(
 
 fn musl_runtime(input: &Path, directory: &Path, identity: &str) -> Result<Value> {
     let host = read(&input.join("host-debian.json"))?;
+    let hosts = read(Path::new(".github/qualification-hosts.json"))?;
+    let configured = hosts["include"]
+        .as_array()
+        .and_then(|rows| {
+            rows.iter()
+                .find(|row| row["host"] == "debian" && row["canonical"] == true)
+        })
+        .ok_or("missing canonical Debian host pin")?;
     let vm = read(&input.join(format!("{identity}.debian.vm.json")))?;
     if host["canonical"] != true
+        || host["host"] != "debian"
+        || host["base_image"] != configured["base_image"]
         || vm["identity"] != identity
         || vm["status"] != "passed"
         || vm["vm_cleanup"] != "destroyed"
@@ -364,22 +374,28 @@ fn musl_runtime(input: &Path, directory: &Path, identity: &str) -> Result<Value>
     if host["sbom_sha256"] != digest(&sbom_path)? {
         return Err("host SBOM differs from its bound qualification environment".into());
     }
+    let os_release = input.join("host-debian.os-release");
+    if fs::symlink_metadata(&os_release)?.len() > 4096
+        || host["os_release_sha256"] != digest(&os_release)?
+    {
+        return Err("Debian os-release differs from its bound qualification environment".into());
+    }
     let host_sbom = read(&sbom_path)?;
-    let runtime = host_sbom["packages"]
+    let mut candidates = host_sbom["packages"]
         .as_array()
         .ok_or("missing host package inventory")?
         .iter()
-        .find(|package| package["name"] == "musl-dev")
+        .filter(|package| package["name"] == "musl-dev");
+    let mut runtime = candidates
+        .next()
+        .cloned()
         .ok_or("actual musl development/runtime version is unknown")?;
-    let mut runtime = runtime.clone();
+    if candidates.next().is_some() {
+        return Err("ambiguous qualified musl package identity".into());
+    }
+    forky_musl_identity(&mut runtime, &fs::read_to_string(&os_release)?)?;
     runtime["licenseDeclared"] = json!("MIT");
     runtime["licenseConcluded"] = json!("MIT");
-    if !runtime["externalRefs"].as_array().is_some_and(|refs| {
-        refs.iter()
-            .any(|reference| reference["referenceType"] == "purl")
-    }) {
-        return Err("musl SBOM lacks package identity for vulnerability matching".into());
-    }
     let license_path = input.join("musl-debian.copyright");
     if host["musl_copyright_sha256"] != digest(&license_path)? {
         return Err("musl copyright differs from the qualified guest".into());
@@ -388,6 +404,81 @@ fn musl_runtime(input: &Path, directory: &Path, identity: &str) -> Result<Value>
     fs::create_dir_all(directory.join("licenses"))?;
     fs::write(directory.join("licenses/musl-MIT.txt"), license)?;
     Ok(runtime)
+}
+
+// Forky omits VERSION_ID while in testing. In SPDX, Syft consequently emits
+// distro=debian and Grype falls back to old suites. Supply the corresponding
+// Debian 14 advisory namespace only after verifying the actual guest identity.
+fn forky_musl_identity(runtime: &mut Value, os_release: &str) -> Result {
+    let mut distro = BTreeMap::new();
+    for (key, value) in os_release.lines().filter_map(|line| line.split_once('=')) {
+        if matches!(key, "ID" | "VERSION_CODENAME" | "VERSION_ID")
+            && distro.insert(key, value.trim_matches('"')).is_some()
+        {
+            return Err("ambiguous guest distro metadata".into());
+        }
+    }
+    if distro.get("ID") != Some(&"debian")
+        || distro.get("VERSION_CODENAME") != Some(&"forky")
+        || distro.get("VERSION_ID").is_some_and(|value| *value != "14")
+        || runtime["versionInfo"] != "1.2.6-2"
+    {
+        return Err("musl assessment requires the pinned Debian Forky package".into());
+    }
+    let mut references = runtime["externalRefs"]
+        .as_array_mut()
+        .ok_or("missing musl SPDX identifiers")?
+        .iter_mut()
+        .filter(|reference| reference["referenceType"] == "purl");
+    let purl = references.next().ok_or("missing qualified musl PURL")?;
+    const RAW: &str = "pkg:deb/debian/musl-dev@1.2.6-2?arch=amd64&distro=debian&upstream=musl";
+    const FORKY: &str = "pkg:deb/debian/musl-dev@1.2.6-2?arch=amd64&distro=debian-14&upstream=musl";
+    if references.next().is_some()
+        || purl["referenceCategory"] != "PACKAGE-MANAGER"
+        || !(purl["referenceLocator"] == RAW || purl["referenceLocator"] == FORKY)
+    {
+        return Err("unexpected qualified Debian musl PURL".into());
+    }
+    purl["referenceLocator"] = json!(FORKY);
+    runtime["sourceInfo"] = json!(
+        "Installed musl-dev from the signed Debian Forky repository. Debian 14 advisory namespace derived from the qualified guest's retained os-release; the original Syft SBOM is retained separately."
+    );
+    Ok(())
+}
+
+#[cfg(test)]
+#[test]
+fn forky_musl_identity_uses_only_proven_forky_and_exact_package() {
+    let raw = json!({
+        "name":"musl-dev",
+        "versionInfo":"1.2.6-2",
+        "externalRefs":[{
+            "referenceCategory":"PACKAGE-MANAGER",
+            "referenceType":"purl",
+            "referenceLocator":"pkg:deb/debian/musl-dev@1.2.6-2?arch=amd64&distro=debian&upstream=musl"
+        }]
+    });
+    let forky = "ID=debian\nVERSION_CODENAME=forky\n";
+    let mut candidate = raw.clone();
+    forky_musl_identity(&mut candidate, forky).unwrap();
+    assert_eq!(
+        candidate["externalRefs"][0]["referenceLocator"],
+        "pkg:deb/debian/musl-dev@1.2.6-2?arch=amd64&distro=debian-14&upstream=musl"
+    );
+    for wrong in [
+        "ID=debian\nVERSION_CODENAME=trixie\nVERSION_ID=13\n",
+        "ID=debian\nVERSION_CODENAME=forky\nVERSION_ID=13\n",
+        "ID=debian\nVERSION_CODENAME=trixie\nVERSION_CODENAME=forky\n",
+    ] {
+        assert!(forky_musl_identity(&mut raw.clone(), wrong).is_err());
+    }
+    let mut stale = raw.clone();
+    stale["versionInfo"] = json!("1.2.5-3.1~deb13u1");
+    assert!(forky_musl_identity(&mut stale, forky).is_err());
+    let mut stale = raw;
+    stale["externalRefs"][0]["referenceLocator"] =
+        json!("pkg:deb/debian/musl-dev@1.2.6-2?arch=amd64&distro=debian-13&upstream=musl");
+    assert!(forky_musl_identity(&mut stale, forky).is_err());
 }
 
 fn hex_pin(text: &str) -> bool {
