@@ -1,0 +1,102 @@
+From 07c14df1341e261a400b37970eca8cfa275854c0 Mon Sep 17 00:00:00 2001
+Subject: nginx 1.30.6 to 1.30.8 source backport (part 4)
+
+Upstream release-to-release diff for src/ and auto/, excluding src/core/nginx.h (version metadata).
+
+diff --git a/src/mail/ngx_mail_smtp_handler.c b/src/mail/ngx_mail_smtp_handler.c
+index 8158c4fa1f55680147d31605c397914adca2b909..7cb4eee78485cb737da697732870993fa1be16ba 100644
+--- a/src/mail/ngx_mail_smtp_handler.c
++++ b/src/mail/ngx_mail_smtp_handler.c
+@@ -17,6 +17,7 @@ static ngx_int_t ngx_mail_smtp_validate_host(ngx_str_t *name);
+ static void ngx_mail_smtp_resolve_name(ngx_event_t *rev);
+ static void ngx_mail_smtp_resolve_name_handler(ngx_resolver_ctx_t *ctx);
+ static void ngx_mail_smtp_block_reading(ngx_event_t *rev);
++static void ngx_mail_smtp_block_writing(ngx_event_t *wev);
+ static void ngx_mail_smtp_greeting(ngx_mail_session_t *s, ngx_connection_t *c);
+ static void ngx_mail_smtp_invalid_pipelining(ngx_event_t *rev);
+ static ngx_int_t ngx_mail_smtp_create_buffer(ngx_mail_session_t *s,
+@@ -92,6 +93,7 @@ ngx_mail_smtp_init_session(ngx_mail_session_t *s, ngx_connection_t *c)
+ 
+     s->resolver_ctx = ctx;
+     c->read->handler = ngx_mail_smtp_block_reading;
++    c->write->handler = ngx_mail_smtp_block_writing;
+ 
+     if (ngx_resolve_addr(ctx) != NGX_OK) {
+         ngx_mail_close_connection(c);
+@@ -159,6 +161,7 @@ ngx_mail_smtp_resolve_addr_handler(ngx_resolver_ctx_t *ctx)
+                    "address resolved: %V", &s->host);
+ 
+     c->read->handler = ngx_mail_smtp_resolve_name;
++    c->write->handler = ngx_mail_send;
+ 
+     ngx_post_event(c->read, &ngx_posted_events);
+ }
+@@ -220,6 +223,7 @@ ngx_mail_smtp_resolve_name(ngx_event_t *rev)
+ 
+     s->resolver_ctx = ctx;
+     c->read->handler = ngx_mail_smtp_block_reading;
++    c->write->handler = ngx_mail_smtp_block_writing;
+ 
+     if (ngx_resolve_name(ctx) != NGX_OK) {
+         ngx_mail_close_connection(c);
+@@ -322,6 +326,38 @@ ngx_mail_smtp_block_reading(ngx_event_t *rev)
+ }
+ 
+ 
++static void
++ngx_mail_smtp_block_writing(ngx_event_t *wev)
++{
++    ngx_connection_t    *c;
++    ngx_mail_session_t  *s;
++    ngx_resolver_ctx_t  *ctx;
++
++    c = wev->data;
++    s = c->data;
++
++    ngx_log_debug0(NGX_LOG_DEBUG_MAIL, c->log, 0, "smtp writing blocked");
++
++    if (ngx_handle_write_event(wev, 0) != NGX_OK) {
++
++        if (s->resolver_ctx) {
++            ctx = s->resolver_ctx;
++
++            if (ctx->handler == ngx_mail_smtp_resolve_addr_handler) {
++                ngx_resolve_addr_done(ctx);
++
++            } else if (ctx->handler == ngx_mail_smtp_resolve_name_handler) {
++                ngx_resolve_name_done(ctx);
++            }
++
++            s->resolver_ctx = NULL;
++        }
++
++        ngx_mail_close_connection(c);
++    }
++}
++
++
+ static void
+ ngx_mail_smtp_greeting(ngx_mail_session_t *s, ngx_connection_t *c)
+ {
+@@ -347,6 +383,8 @@ ngx_mail_smtp_greeting(ngx_mail_session_t *s, ngx_connection_t *c)
+         ngx_post_event(c->read, &ngx_posted_events);
+     }
+ 
++    c->write->handler = ngx_mail_send;
++
+     if (sscf->greeting_delay) {
+          c->read->handler = ngx_mail_smtp_invalid_pipelining;
+          return;
+diff --git a/src/stream/ngx_stream_ssl_module.c b/src/stream/ngx_stream_ssl_module.c
+index 0e17cff4d96eba8b0d6aa8b5b492311213ce7e1b..12e2d348b13f7b86d5da5ded31292396e4e8b7c0 100644
+--- a/src/stream/ngx_stream_ssl_module.c
++++ b/src/stream/ngx_stream_ssl_module.c
+@@ -459,6 +459,8 @@ ngx_stream_ssl_handler(ngx_stream_session_t *s)
+         }
+     }
+ 
++    sscf = ngx_stream_get_module_srv_conf(s, ngx_stream_ssl_module);
++
+     if (sscf->verify) {
+         rc = SSL_get_verify_result(c->ssl->connection);
+ 

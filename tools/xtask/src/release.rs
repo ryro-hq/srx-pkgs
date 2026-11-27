@@ -13,6 +13,7 @@ use std::{
 mod dependencies;
 mod evidence;
 mod vex;
+pub(super) use vex::nginx_patch_module;
 
 pub(super) use evidence::execute as package_evidence;
 
@@ -135,7 +136,7 @@ fn inventory(
     directory: &Path,
     manifest: &Value,
     selection: Option<&evidence::Selection<'_>>,
-) -> Result<(bool, Vec<Value>)> {
+) -> Result<(BTreeSet<vex::Product>, Vec<Value>)> {
     let policy = read(Path::new("security/package-licenses.json"))?;
     let dependency_policy = read(Path::new("security/runtime-dependencies.json"))?;
     let lock = read(Path::new("Catalog.lock"))?;
@@ -151,7 +152,7 @@ fn inventory(
     let mut spdx_ids: BTreeMap<String, String> = BTreeMap::new();
     let mut source_inventory = BTreeMap::new();
     let mut dependencies = BTreeSet::new();
-    let mut use_glibc_vex = false;
+    let mut assessed_products = BTreeSet::new();
     let mut runtime_inventory = Vec::new();
     let mut qualified = Vec::new();
     for report in manifest["packages"]
@@ -190,6 +191,7 @@ fn inventory(
         {
             return Err("license policy differs from qualified source".into());
         }
+        assessed_products.extend(vex::Product::from_component(&name, &version));
         // A version can have both a static and a dynamic build. Give each
         // qualified application its own graph node, even if the source is shared.
         let application = format!("SPDXRef-Application-{identity}");
@@ -233,7 +235,7 @@ fn inventory(
             {
                 return Err("runtime recipe differs from reviewed license source".into());
             }
-            use_glibc_vex |= name == "glibc" && pin["role"] == "gnu-runtime";
+            assessed_products.extend(vex::Product::from_component(name, version));
             let spdx = match spdx_ids.get(&component) {
                 Some(id) => id.clone(),
                 None => {
@@ -307,10 +309,10 @@ fn inventory(
         ),
     )?;
     if selection.is_none() {
-        scan(directory, use_glibc_vex, Path::new("grype"))?;
+        scan(directory, &assessed_products, Path::new("grype"))?;
         checksums(directory)?;
     }
-    Ok((use_glibc_vex, qualified))
+    Ok((assessed_products, qualified))
 }
 
 fn reviewed_component<'a>(policy: &'a Value, name: &str, version: &str) -> Result<&'a Value> {
@@ -502,7 +504,7 @@ fn upstream(input: &Path, directory: &Path, policy: &Value) -> Result<Value> {
             )?;
         }
         result["sourceInfo"] = json!(
-            "Upstream archive plus exact reviewed patches retained under sources/; see vex-policy.json for recipe and source bindings."
+            "Upstream archive plus exact reviewed patches retained under sources/; see the retained VEX policy for recipe and source bindings."
         );
     }
     if let Some(cpe) = policy["cpe"].as_str() {
@@ -614,11 +616,18 @@ fn validate_sbom(document: &Value) -> Result {
     }
     Ok(())
 }
-fn scan(directory: &Path, use_glibc_vex: bool, scanner: &Path) -> Result<Option<vex::Assessment>> {
+fn scan(
+    directory: &Path,
+    products: &BTreeSet<vex::Product>,
+    scanner: &Path,
+) -> Result<Vec<vex::Assessment>> {
     let sbom = directory.join("sbom.spdx.json");
     validate_sbom(&read(&sbom)?)?;
     let report = directory.join("grype.json");
-    let assessment = use_glibc_vex.then(|| vex::prepare(directory)).transpose()?;
+    let assessments = products
+        .iter()
+        .map(|product| vex::prepare(directory, *product))
+        .collect::<Result<Vec<_>>>()?;
     // Use a known config rather than settings in the caller's home or checkout.
     // In particular an ambient DB URL or report filter is not release policy.
     let configuration = tempfile::Builder::new().suffix(".yaml").tempfile()?;
@@ -637,7 +646,7 @@ fn scan(directory: &Path, use_glibc_vex: bool, scanner: &Path) -> Result<Option<
     }
     command.arg("--config").arg(configuration.path());
     command.arg(format!("sbom:{}", sbom.display()));
-    if let Some(ref assessment) = assessment {
+    for assessment in &assessments {
         command.arg("--vex").arg(&assessment.document);
     }
     let status = command
@@ -653,8 +662,8 @@ fn scan(directory: &Path, use_glibc_vex: bool, scanner: &Path) -> Result<Option<
     let report = read(&report)?;
     validate_scan(&report)?;
     evidence::database(&report)?;
-    vex::validate_ignored(&report, assessment.as_ref())?;
-    Ok(assessment)
+    vex::validate_ignored(&report, &assessments)?;
+    Ok(assessments)
 }
 fn validate_scan(report: &Value) -> Result {
     if !report["matches"].is_array() {

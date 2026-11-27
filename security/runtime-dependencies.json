@@ -14,14 +14,38 @@
       "static_host": ["musl-dev"]
     },
     {
-      "name": "nginx", "versions": ["1.30.5", "1.30.6", "1.30.8"], "variant": "minimal", "system": "linux-x86_64-gnu",
-      "recipe_sha256": "d5dd61f9c409a34520deb22e081c9cae02b402cd6b063c393582fa68c6ca1dce",
+      "name": "nginx", "versions": ["1.30.5"], "variant": "minimal", "system": "linux-x86_64-gnu",
+      "recipe_sha256": "f622cc286b47e5222612041727a1d7af357ca5c431f2e1b07dd4b322a0327734",
       "runtime": {"loader": "glibc@2.44", "library_0": "glibc@2.44"},
       "static_host": []
     },
     {
-      "name": "nginx", "versions": ["1.30.5", "1.30.6", "1.30.8"], "variant": "minimal", "system": "linux-x86_64-musl",
-      "recipe_sha256": "f816099b1d85a23dc3c067a9dfce4972f503b8bd39f93e104cd7e7ce7fe1b9b1",
+      "name": "nginx", "versions": ["1.30.5"], "variant": "minimal", "system": "linux-x86_64-musl",
+      "recipe_sha256": "fe5d68e03d467be26abd79f8c11f1d86c08fd06dbe09bc3ae60ae6cd7b52ce69",
+      "runtime": {},
+      "static_host": ["musl-dev"]
+    },
+    {
+      "name": "nginx", "versions": ["1.30.6"], "variant": "minimal", "system": "linux-x86_64-gnu",
+      "recipe_sha256": "0c651c0f547f65d248bbaf5878ff1eeefe7a0bfb0e9577a0992c64a46beed97e",
+      "runtime": {"loader": "glibc@2.44", "library_0": "glibc@2.44"},
+      "static_host": []
+    },
+    {
+      "name": "nginx", "versions": ["1.30.6"], "variant": "minimal", "system": "linux-x86_64-musl",
+      "recipe_sha256": "45966bc81366fdcce2b1eeafd02f6e8541ba18632f672e3ea515cf26172fdc1b",
+      "runtime": {},
+      "static_host": ["musl-dev"]
+    },
+    {
+      "name": "nginx", "versions": ["1.30.8"], "variant": "minimal", "system": "linux-x86_64-gnu",
+      "recipe_sha256": "7a367a11a9ab6e9ec8830235605cd1d896f96df43d5e409a5e70c29e2667aaff",
+      "runtime": {"loader": "glibc@2.44", "library_0": "glibc@2.44"},
+      "static_host": []
+    },
+    {
+      "name": "nginx", "versions": ["1.30.8"], "variant": "minimal", "system": "linux-x86_64-musl",
+      "recipe_sha256": "8d651d21cf9beafe0e0168ee0ec420eccd88e158b88924f43a41f6116f00a99c",
       "runtime": {},
       "static_host": ["musl-dev"]
     }

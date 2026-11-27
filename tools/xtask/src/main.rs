@@ -111,6 +111,7 @@ fn execute() -> Result {
         ["check"] => {
             run("cargo", &["fmt", "--all", "--", "--check"])?; format(false)?;
             for args in [["catalog", "generate", ".", "--check"].as_slice(), &["catalog", "check", "."], &["catalog", "lock", ".", "--check"]] { print!("{}", srx(args)?); }
+            release::nginx_patch_module(false)?;
             release::check_dependency_profiles()?;
             suite("all")
         }
@@ -122,6 +123,7 @@ fn execute() -> Result {
         ["security", "exceptions"] => policy::exceptions(),
         ["security", "vex-status"] => release::vex_status(false),
         ["security", "vex-scope"] => release::vex_scope(),
+        ["security", "nginx-patch-module", "--write"] => release::nginx_patch_module(true),
         ["security", "dependency-scopes"] => release::dependency_scopes(),
         ["security", "vex-status", "--require-current"] => release::vex_status(true),
         ["security", "renew"] => Err("use cargo xtask security renew vex|advisory|license EXACT_ID YYYY-MM-DD HTTPS_REVIEW_URL".into()),

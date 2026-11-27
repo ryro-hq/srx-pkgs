@@ -127,10 +127,11 @@ the expiry date itself is no longer valid.
 2. For an unchanged scope, preview a renewal (future date within 90 days):
 
    ```sh
-   cargo xtask security renew vex glibc@2.44 YYYY-MM-DD https://example.org/review
+    cargo xtask security renew vex glibc@2.44 YYYY-MM-DD https://example.org/review
    ```
 
-   Use `advisory ADVISORY_ID` or `license 'NAME@=VERSION'` instead for exceptions.
+    Use the exact product version for other VEX assessments (for example,
+    `nginx@1.30.5`). Use `advisory ADVISORY_ID` or `license 'NAME@=VERSION'` for exceptions.
    The command prints the current scope and candidate JSON, never edits policy.
    Review a diff and submit it for human approval. Drop a finding or exception
    when it no longer needs suppression; do not extend it on a timer.

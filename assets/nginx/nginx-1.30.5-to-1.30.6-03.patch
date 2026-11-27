@@ -1,0 +1,175 @@
+From fb0e979c6dd63c018958b41eeb844947c5c21264 Mon Sep 17 00:00:00 2001
+Subject: nginx 1.30.5 to 1.30.6 source backport (part 3)
+
+Upstream release-to-release diff for src/ and auto/, excluding src/core/nginx.h (version metadata).
+
+diff --git a/src/http/modules/ngx_http_dav_module.c b/src/http/modules/ngx_http_dav_module.c
+index 4619b139a2436d6531c3fd3860ba0dea74be12c2..022c7840a92d4478f8375583dd6542d8f247567a 100644
+--- a/src/http/modules/ngx_http_dav_module.c
++++ b/src/http/modules/ngx_http_dav_module.c
+@@ -536,7 +536,7 @@ static ngx_int_t
+ ngx_http_dav_copy_move_handler(ngx_http_request_t *r)
+ {
+     u_char                    *p, *host, *last, ch;
+-    size_t                     len, root;
++    size_t                     len, root, alias;
+     ngx_err_t                  err;
+     ngx_int_t                  rc, depth;
+     ngx_uint_t                 overwrite, slash, dir, flags;
+@@ -646,15 +646,19 @@ destination_done:
+     }
+ 
+     clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
++    alias = clcf->alias;
+ 
+-    if (clcf->alias
+-        && clcf->alias != NGX_MAX_SIZE_T_VALUE
+-        && duri.len < clcf->alias)
+-    {
+-        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+-                      "client sent invalid \"Destination\" header: \"%V\"",
+-                      &dest->value);
+-        return NGX_HTTP_BAD_REQUEST;
++    if (alias && alias != NGX_MAX_SIZE_T_VALUE && r->valid_location) {
++
++        if (alias > duri.len
++            || ngx_filename_cmp(duri.data, r->uri.data, alias) != 0)
++        {
++            ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
++                          "\"Destination\" URI \"%V\" must be "
++                          "within location prefix when using \"alias\"",
++                          &dest->value);
++            return NGX_HTTP_BAD_REQUEST;
++        }
+     }
+ 
+     depth = ngx_http_dav_depth(r, NGX_HTTP_DAV_INFINITY_DEPTH);
+diff --git a/src/http/modules/ngx_http_geo_module.c b/src/http/modules/ngx_http_geo_module.c
+index 5018e1abb572b7e636c42b368dea1b491357a49f..4c8e7c6abca49eb9f15faa2139b2ae9a66bd59d0 100644
+--- a/src/http/modules/ngx_http_geo_module.c
++++ b/src/http/modules/ngx_http_geo_module.c
+@@ -1423,7 +1423,6 @@ ngx_http_geo_include_binary_base(ngx_conf_t *cf, ngx_http_geo_conf_ctx_t *ctx,
+     time_t                      mtime;
+     size_t                      size, len;
+     ssize_t                     n;
+-    uint32_t                    crc32;
+     ngx_err_t                   err;
+     ngx_int_t                   rc;
+     ngx_uint_t                  i;
+@@ -1518,24 +1517,45 @@ ngx_http_geo_include_binary_base(ngx_conf_t *cf, ngx_http_geo_conf_ctx_t *ctx,
+         goto failed;
+     }
+ 
+-    ngx_crc32_init(crc32);
++    /*
++     * the base is walked below without bounds checking, so make sure
++     * it is intact first: the checksum in the header is computed over
++     * the entire body, which the walk covers contiguously
++     */
++
++    if (size < sizeof(ngx_http_geo_header_t)
++               + sizeof(ngx_http_variable_value_t)
++               + 0x10000 * sizeof(ngx_http_geo_range_t *))
++    {
++        ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
++                           "truncated binary geo range base \"%s\"",
++                           name->data);
++        goto failed;
++    }
++
++    if (ngx_crc32_long(base + sizeof(ngx_http_geo_header_t),
++                       size - sizeof(ngx_http_geo_header_t))
++        != header->crc32)
++    {
++        ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
++                           "CRC32 mismatch in binary geo range base \"%s\"",
++                           name->data);
++        goto failed;
++    }
+ 
+     vv = (ngx_http_variable_value_t *) (base + sizeof(ngx_http_geo_header_t));
+ 
+     while (vv->data) {
+         len = ngx_align(sizeof(ngx_http_variable_value_t) + vv->len,
+                         sizeof(void *));
+-        ngx_crc32_update(&crc32, (u_char *) vv, len);
+         vv->data += (size_t) base;
+         vv = (ngx_http_variable_value_t *) ((u_char *) vv + len);
+     }
+-    ngx_crc32_update(&crc32, (u_char *) vv, sizeof(ngx_http_variable_value_t));
+     vv++;
+ 
+     ranges = (ngx_http_geo_range_t **) vv;
+ 
+     for (i = 0; i < 0x10000; i++) {
+-        ngx_crc32_update(&crc32, (u_char *) &ranges[i], sizeof(void *));
+         if (ranges[i]) {
+             ranges[i] = (ngx_http_geo_range_t *)
+                             ((u_char *) ranges[i] + (size_t) base);
+@@ -1546,24 +1566,13 @@ ngx_http_geo_include_binary_base(ngx_conf_t *cf, ngx_http_geo_conf_ctx_t *ctx,
+ 
+     while ((u_char *) range < base + size) {
+         while (range->value) {
+-            ngx_crc32_update(&crc32, (u_char *) range,
+-                             sizeof(ngx_http_geo_range_t));
+             range->value = (ngx_http_variable_value_t *)
+                                ((u_char *) range->value + (size_t) base);
+             range++;
+         }
+-        ngx_crc32_update(&crc32, (u_char *) range, sizeof(void *));
+         range = (ngx_http_geo_range_t *) ((u_char *) range + sizeof(void *));
+     }
+ 
+-    ngx_crc32_final(crc32);
+-
+-    if (crc32 != header->crc32) {
+-        ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
+-                  "CRC32 mismatch in binary geo range base \"%s\"", name->data);
+-        goto failed;
+-    }
+-
+     ngx_conf_log_error(NGX_LOG_NOTICE, cf, 0,
+                        "using binary geo range base \"%s\"", name->data);
+ 
+diff --git a/src/http/modules/ngx_http_image_filter_module.c b/src/http/modules/ngx_http_image_filter_module.c
+index 6c03e8aecec9d659edfe9378586434e479927855..283471ea0d067fc4d1ab675c5b1a0f1b97330062 100644
+--- a/src/http/modules/ngx_http_image_filter_module.c
++++ b/src/http/modules/ngx_http_image_filter_module.c
+@@ -510,6 +510,7 @@ ngx_http_image_read(ngx_http_request_t *r, ngx_chain_t *in)
+ 
+         if (b->last_buf) {
+             ctx->last = p;
++            ctx->length = p - ctx->image;
+             return NGX_OK;
+         }
+     }
+diff --git a/src/http/modules/ngx_http_log_module.c b/src/http/modules/ngx_http_log_module.c
+index d282362ea6a1022cd436903efd64f86102c02c77..91589747e3a9e7d420b39f02c86787e354c80d41 100644
+--- a/src/http/modules/ngx_http_log_module.c
++++ b/src/http/modules/ngx_http_log_module.c
+@@ -246,7 +246,7 @@ static ngx_http_log_var_t  ngx_http_log_vars[] = {
+     { ngx_string("bytes_sent"), NGX_OFF_T_LEN, ngx_http_log_bytes_sent },
+     { ngx_string("body_bytes_sent"), NGX_OFF_T_LEN,
+                           ngx_http_log_body_bytes_sent },
+-    { ngx_string("request_length"), NGX_SIZE_T_LEN,
++    { ngx_string("request_length"), NGX_OFF_T_LEN,
+                           ngx_http_log_request_length },
+ 
+     { ngx_null_string, 0, NULL }
+diff --git a/src/http/modules/ngx_http_memcached_module.c b/src/http/modules/ngx_http_memcached_module.c
+index 11bbd91659c76fe34592315e895a482d8f04b3d4..178140d2facc63a3936f1efce3dcdd318dd20c89 100644
+--- a/src/http/modules/ngx_http_memcached_module.c
++++ b/src/http/modules/ngx_http_memcached_module.c
+@@ -413,7 +413,11 @@ found:
+         p = line.data + line.len;
+ 
+         u->headers_in.content_length_n = ngx_atoof(start, p - start);
+-        if (u->headers_in.content_length_n == NGX_ERROR) {
++
++        if (u->headers_in.content_length_n == NGX_ERROR
++            || u->headers_in.content_length_n
++               > NGX_MAX_OFF_T_VALUE - (off_t) NGX_HTTP_MEMCACHED_END)
++        {
+             ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                           "memcached sent invalid length in response \"%V\" "
+                           "for key \"%V\"",

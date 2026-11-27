@@ -1,0 +1,197 @@
+From fb0e979c6dd63c018958b41eeb844947c5c21264 Mon Sep 17 00:00:00 2001
+Subject: nginx 1.30.5 to 1.30.6 source backport (part 7)
+
+Upstream release-to-release diff for src/ and auto/, excluding src/core/nginx.h (version metadata).
+
+diff --git a/src/http/ngx_http_upstream.c b/src/http/ngx_http_upstream.c
+index b6456136936be88569704d7910a07575224cd995..449508ac7be6e68a3283f2acce20fa3288461996 100644
+--- a/src/http/ngx_http_upstream.c
++++ b/src/http/ngx_http_upstream.c
+@@ -1116,8 +1116,10 @@ ngx_http_upstream_cache_send(ngx_http_request_t *r, ngx_http_upstream_t *u)
+ 
+     if (rc == NGX_OK) {
+ 
+-        if (ngx_http_upstream_process_headers(r, u) != NGX_OK) {
+-            return NGX_DONE;
++        rc = ngx_http_upstream_process_headers(r, u);
++
++        if (rc != NGX_OK) {
++            return rc;
+         }
+ 
+         return ngx_http_cache_send(r);
+@@ -2610,7 +2612,14 @@ again:
+         u->peer.notify(&u->peer, u->peer.data, NGX_HTTP_UPSTREAM_NOTIFY_HEADER);
+     }
+ 
+-    if (ngx_http_upstream_process_headers(r, u) != NGX_OK) {
++    rc = ngx_http_upstream_process_headers(r, u);
++
++    if (rc == NGX_DONE) {
++        return;
++    }
++
++    if (rc == NGX_ERROR) {
++        ngx_http_upstream_finalize_request(r, u, NGX_ERROR);
+         return;
+     }
+ 
+@@ -3065,7 +3074,9 @@ ngx_http_upstream_process_headers(ngx_http_request_t *r, ngx_http_upstream_t *u)
+     if (u->headers_in.x_accel_redirect
+         && !(u->conf->ignore_headers & NGX_HTTP_UPSTREAM_IGN_XA_REDIRECT))
+     {
+-        ngx_http_upstream_finalize_request(r, u, NGX_DECLINED);
++        if (u->cleanup) {
++            ngx_http_upstream_finalize_request(r, u, NGX_DECLINED);
++        }
+ 
+         part = &u->headers_in.headers.part;
+         h = part->elts;
+@@ -3154,18 +3165,14 @@ ngx_http_upstream_process_headers(ngx_http_request_t *r, ngx_http_upstream_t *u)
+ 
+         if (hh) {
+             if (hh->copy_handler(r, &h[i], hh->conf) != NGX_OK) {
+-                ngx_http_upstream_finalize_request(r, u,
+-                                               NGX_HTTP_INTERNAL_SERVER_ERROR);
+-                return NGX_DONE;
++                return NGX_ERROR;
+             }
+ 
+             continue;
+         }
+ 
+         if (ngx_http_upstream_copy_header_line(r, &h[i], 0) != NGX_OK) {
+-            ngx_http_upstream_finalize_request(r, u,
+-                                               NGX_HTTP_INTERNAL_SERVER_ERROR);
+-            return NGX_DONE;
++            return NGX_ERROR;
+         }
+     }
+ 
+@@ -4177,6 +4184,12 @@ ngx_http_upstream_thread_handler(ngx_thread_task_t *task, ngx_file_t *file)
+     task->event.data = r;
+     task->event.handler = ngx_http_upstream_thread_event_handler;
+ 
++    if (r->main->blocked >= NGX_HTTP_MAX_BLOCKED) {
++        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
++                      "too many operations pending");
++        return NGX_ERROR;
++    }
++
+     if (ngx_thread_task_post(tp, task) != NGX_OK) {
+         return NGX_ERROR;
+     }
+diff --git a/src/http/v2/ngx_http_v2.c b/src/http/v2/ngx_http_v2.c
+index efe22903fa907a7e613f437b0eba8a79be4cb9df..bea5c88eae4520735174134b25decfcd14fa2882 100644
+--- a/src/http/v2/ngx_http_v2.c
++++ b/src/http/v2/ngx_http_v2.c
+@@ -2181,6 +2181,8 @@ ngx_http_v2_state_settings(ngx_http_v2_connection_t *h2c, u_char *pos,
+         return ngx_http_v2_connection_error(h2c, NGX_HTTP_V2_SIZE_ERROR);
+     }
+ 
++    h2c->state.window_delta = 0;
++
+     return ngx_http_v2_state_settings_params(h2c, pos, end);
+ }
+ 
+@@ -2189,12 +2191,9 @@ static u_char *
+ ngx_http_v2_state_settings_params(ngx_http_v2_connection_t *h2c, u_char *pos,
+     u_char *end)
+ {
+-    ssize_t                   window_delta;
+     ngx_uint_t                id, value;
+     ngx_http_v2_out_frame_t  *frame;
+ 
+-    window_delta = 0;
+-
+     while (h2c->state.length) {
+         if (end - pos < NGX_HTTP_V2_SETTINGS_PARAM_SIZE) {
+             return ngx_http_v2_state_save(h2c, pos, end,
+@@ -2222,7 +2221,8 @@ ngx_http_v2_state_settings_params(ngx_http_v2_connection_t *h2c, u_char *pos,
+                                                   NGX_HTTP_V2_FLOW_CTRL_ERROR);
+             }
+ 
+-            window_delta = value - h2c->init_window;
++            h2c->state.window_delta = (ssize_t) value
++                                      - (ssize_t) h2c->init_window;
+             break;
+ 
+         case NGX_HTTP_V2_MAX_FRAME_SIZE_SETTING:
+@@ -2275,13 +2275,16 @@ ngx_http_v2_state_settings_params(ngx_http_v2_connection_t *h2c, u_char *pos,
+ 
+     ngx_http_v2_queue_ordered_frame(h2c, frame);
+ 
+-    if (window_delta) {
+-        h2c->init_window += window_delta;
++    if (h2c->state.window_delta) {
++        h2c->init_window += h2c->state.window_delta;
+ 
+-        if (ngx_http_v2_adjust_windows(h2c, window_delta) != NGX_OK) {
++        if (ngx_http_v2_adjust_windows(h2c, h2c->state.window_delta) != NGX_OK)
++        {
+             return ngx_http_v2_connection_error(h2c,
+                                                 NGX_HTTP_V2_INTERNAL_ERROR);
+         }
++
++        h2c->state.window_delta = 0;
+     }
+ 
+     return ngx_http_v2_state_complete(h2c, pos, end);
+diff --git a/src/http/v2/ngx_http_v2.h b/src/http/v2/ngx_http_v2.h
+index 9605c8a23d5d645ebbabcd543363c39fee128b9e..beb77a5c1db9eed659fe8719a0fe93e68ca144ad 100644
+--- a/src/http/v2/ngx_http_v2.h
++++ b/src/http/v2/ngx_http_v2.h
+@@ -80,6 +80,7 @@ typedef struct {
+     ngx_uint_t                       sid;
+     size_t                           length;
+     size_t                           padding;
++    ssize_t                          window_delta;
+     unsigned                         flags:8;
+ 
+     unsigned                         incomplete:1;
+diff --git a/src/http/v3/ngx_http_v3_parse.c b/src/http/v3/ngx_http_v3_parse.c
+index bcbf0dbe1208d8ee92d001b8a22ab005ad32440e..ffaade84295ad3aabf6b4fcc40505dc3342839a3 100644
+--- a/src/http/v3/ngx_http_v3_parse.c
++++ b/src/http/v3/ngx_http_v3_parse.c
+@@ -1837,6 +1837,8 @@ ngx_http_v3_parse_data(ngx_connection_t *c, ngx_http_v3_parse_data_t *st,
+                            st->type, st->length);
+ 
+             if (st->type != NGX_HTTP_V3_FRAME_DATA && st->length > 0) {
++                st->skip = st->length;
++                st->length = 0;
+                 st->state = sw_skip;
+                 break;
+             }
+@@ -1846,7 +1848,7 @@ ngx_http_v3_parse_data(ngx_connection_t *c, ngx_http_v3_parse_data_t *st,
+ 
+         case sw_skip:
+ 
+-            rc = ngx_http_v3_parse_skip(b, &st->length);
++            rc = ngx_http_v3_parse_skip(b, &st->skip);
+             if (rc != NGX_DONE) {
+                 return rc;
+             }
+diff --git a/src/http/v3/ngx_http_v3_parse.h b/src/http/v3/ngx_http_v3_parse.h
+index ba004db5df4305d2ec8e2cdd45b31066497d4970..e161cecf7bda5d8c96a1a7800e72ba17890e823d 100644
+--- a/src/http/v3/ngx_http_v3_parse.h
++++ b/src/http/v3/ngx_http_v3_parse.h
+@@ -121,6 +121,7 @@ typedef struct {
+     ngx_uint_t                      state;
+     ngx_uint_t                      type;
+     ngx_uint_t                      length;
++    ngx_uint_t                      skip;
+     ngx_http_v3_parse_varlen_int_t  vlint;
+ } ngx_http_v3_parse_data_t;
+ 
+diff --git a/src/mail/ngx_mail_imap_handler.c b/src/mail/ngx_mail_imap_handler.c
+index 291e87a4deba134ba0faad127704200389ef1a53..dc8cbefabf788e75e544a254c8dfd44287886f01 100644
+--- a/src/mail/ngx_mail_imap_handler.c
++++ b/src/mail/ngx_mail_imap_handler.c
+@@ -48,6 +48,7 @@ ngx_mail_imap_init_session(ngx_mail_session_t *s, ngx_connection_t *c)
+ 
+     if (ngx_handle_read_event(c->read, 0) != NGX_OK) {
+         ngx_mail_close_connection(c);
++        return;
+     }
+ 
+     ngx_mail_send(c->write);

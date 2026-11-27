@@ -75,7 +75,7 @@ fn parse_outputs(inspected: &str, report: &Value) -> Result<Outputs> {
 
 // The package's exact source pin is reviewed separately. Shared recipe bytes
 // matter here; the global lock, generated releases list and unrelated exports do not.
-fn recipe_scope(locked: &Value) -> Result<String> {
+pub(super) fn recipe_scope(locked: &Value) -> Result<String> {
     let inputs = locked["inputs"]
         .as_object()
         .ok_or("missing locked recipe inputs")?;

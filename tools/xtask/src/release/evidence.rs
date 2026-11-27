@@ -71,11 +71,11 @@ pub(crate) fn execute(args: &[&str]) -> Result {
         ])?
     );
     let manifest = read(&manifest_path)?;
-    let (use_glibc_vex, reports) = inventory(&input, &output, &manifest, Some(&selection))?;
+    let (products, reports) = inventory(&input, &output, &manifest, Some(&selection))?;
     let tools = work.path().join("tools");
     crate::policy::tools(&tools, "grype")?;
     let scanner = tools.join("grype");
-    let assessed = match scan(&output, use_glibc_vex, &scanner) {
+    let assessed = match scan(&output, &products, &scanner) {
         Ok(assessed) => assessed,
         Err(error) => {
             if *mode == "generate" {
@@ -108,7 +108,7 @@ pub(crate) fn execute(args: &[&str]) -> Result {
         fs::create_dir(destination)?;
         crate::copy(&output, destination)?;
     } else {
-        compare(&output, destination, assessed.as_ref())?;
+        compare(&output, destination, &assessed)?;
     }
     println!(
         "Per-package license, SPDX and vulnerability evidence verified for {name} {version} {variant} {system}"
@@ -147,7 +147,7 @@ pub(super) fn database(report: &Value) -> Result<Value> {
     Ok(json!({"from":from,"sha256":pin,"built":status["built"],"schema":status["schemaVersion"]}))
 }
 
-fn compare(fresh: &Path, retained: &Path, assessment: Option<&super::vex::Assessment>) -> Result {
+fn compare(fresh: &Path, retained: &Path, assessments: &[super::vex::Assessment]) -> Result {
     if read(&fresh.join("evidence.json"))? != read(&retained.join("evidence.json"))? {
         return Err(
             "evidence identity, qualification or scanner database changed; regenerate the evidence"
@@ -184,7 +184,7 @@ fn compare(fresh: &Path, retained: &Path, assessment: Option<&super::vex::Assess
     let before = read(&retained.join("grype.json"))?;
     let after = read(&fresh.join("grype.json"))?;
     super::validate_scan(&before)?;
-    super::vex::validate_ignored(&before, assessment)?;
+    super::vex::validate_ignored(&before, assessments)?;
     if database(&before)? != database(&after)?
         || before["descriptor"]["version"] != after["descriptor"]["version"]
         || findings(&before, "matches")? != findings(&after, "matches")?
@@ -261,10 +261,10 @@ mod tests {
         }
         super::super::checksums(retained.path()).unwrap();
         verify_checksums(retained.path()).unwrap();
-        compare(fresh.path(), retained.path(), None).unwrap();
+        compare(fresh.path(), retained.path(), &[]).unwrap();
         fs::write(retained.path().join("LICENSE"), "replacement text").unwrap();
         super::super::checksums(retained.path()).unwrap();
         verify_checksums(retained.path()).unwrap();
-        assert!(compare(fresh.path(), retained.path(), None).is_err());
+        assert!(compare(fresh.path(), retained.path(), &[]).is_err());
     }
 }

@@ -17,8 +17,11 @@ fn program() -> Build {
         profile = BuildProfile::Managed;
         source_directory = "nginx-1.30.5";
         timeout_seconds = 600;
-        steps = [
-            BuildStep::Extract(BuildPath::Work("source")),
+        steps = [BuildStep::Extract(BuildPath::Work("source"))] ++ patches::apply(
+            "1.30.5",
+            lib::toolchain::tools("usr/bin/patch"),
+            lib::managed::script_environment()
+        ) ++ [
             builders::process::run(
                 BuildPath::Input(4, "usr/bin/sh"),
                 cwd,
