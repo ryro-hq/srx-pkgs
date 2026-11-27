@@ -48,5 +48,25 @@ combination [passed with no cached Store](https://github.com/ryro-hq/srx-pkgs/ac
 
 Qualification now uses an empty private Store per job; it does not restore or
 save materialized views. The environment artifact, materialization checks,
-native matrix and offline import requirements are unchanged. The fixed workflow
-still needs a fresh hosted run.
+native matrix and offline import requirements are unchanged. The
+[hosted rerun](https://github.com/ryro-hq/srx-pkgs/actions/runs/45897538347)
+passed all twelve native rows and both host manifests. `verify` revalidated the
+bundles offline, then stopped on the expired single-patch glibc assessment.
+
+## Release scan blockers
+
+A separate, unsuppressed Grype scan of the SPDX generated from that run (database
+built `2026-11-26T06:22:34Z`) found CVE-2026-84243 (High) in the old glibc runtime.
+It also found independent blocking matches:
+
+- nginx 1.30.5 and 1.30.6: multiple Critical findings, including
+  [CVE-2026-123007](https://nginx.org/en/security_advisories.html). Updating the
+  default alone does not remediate either qualified historical version.
+- Debian's `musl-dev` `1.2.5-3.1~deb13u1`:
+  [CVE-2026-107891](https://security-tracker.debian.org/tracker/CVE-2026-107891)
+  (High). Debian lists a fix in its newer `1.2.6-2` source package, not in the
+  pinned stable guest's version.
+
+These findings are not covered by the new glibc assessment. Qualify fixed
+artifacts and rerun the complete gate; this scan is not a passing release
+result or evidence for the updated runtime.

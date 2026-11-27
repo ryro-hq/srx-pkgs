@@ -78,6 +78,34 @@ fn program(options: BuildOptions) -> Build {
                 lib::toolchain::tools("usr/bin/make"),
                 cwd,
                 [
+                    build_text("test"),
+                    build_text("t=intl/tst-gettext-path-traversal"),
+                    build_join([
+                            BuildPart::Literal("MSGFMT="),
+                            BuildPart::Path(lib::toolchain::tools("usr/bin/msgfmt"))
+                        ]),
+                    make_shell(),
+                    make_cc(),
+                    make_build_cc()
+                ],
+                environment(target_compiler())
+            ),
+            patches::require_pass(
+                "stdlib/tst-strfmon-bug34510",
+                lib::toolchain::tools("usr/bin/sh"),
+                cwd,
+                environment(target_compiler())
+            ),
+            patches::require_pass(
+                "intl/tst-gettext-path-traversal",
+                lib::toolchain::tools("usr/bin/sh"),
+                cwd,
+                environment(target_compiler())
+            ),
+            builders::process::run(
+                lib::toolchain::tools("usr/bin/make"),
+                cwd,
+                [
                     build_text("install"),
                     build_text("DESTDIR=/out"),
                     make_shell(),

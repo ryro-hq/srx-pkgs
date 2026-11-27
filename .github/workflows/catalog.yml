@@ -125,7 +125,7 @@ jobs:
         id: vm-cache
         with:
           path: .environment
-          key: catalog-vm-${{ matrix.host }}-linux-6.12.109-${{ hashFiles('.syrox-core', '.github/qualification-hosts.json', 'tools/xtask/src/qualification.rs', '.core/tests/vm/*.Containerfile', '.core/crates/syrox/tests/vm_support/prepare.rs') }}
+          key: catalog-vm-${{ matrix.host }}-linux-6.12.109-${{ hashFiles('.syrox-core', '.github/qualification-hosts.json', '.github/catalog-guest.Containerfile', 'tools/xtask/src/qualification.rs', '.core/tests/vm/*.Containerfile', '.core/crates/syrox/tests/vm_support/prepare.rs') }}
       - name: Build the isolated Linux environment
         if: steps.vm-cache.outputs.cache-hit != 'true'
         working-directory: .core
@@ -135,12 +135,13 @@ jobs:
           QUALIFICATION_HOST: ${{ matrix.host }}
         run: |
           mkdir -p ../.environment
+          cat tests/vm/guest.Containerfile ../.github/catalog-guest.Containerfile > "$RUNNER_TEMP/catalog-guest.Containerfile"
           docker buildx create --name catalog-environment --driver docker-container \
             --driver-opt cpu-period=100000,cpu-quota=200000,memory=4g,memory-swap=4g
           docker buildx build --builder catalog-environment --load --iidfile ../.environment/image.id \
             --build-arg RUST_IMAGE=rust@sha256:4cd829461bd5c4d511c32e269da9cb8929223b666519d8004e35fc8d1d771ab7 \
             --build-arg BASE_IMAGE="$BASE_IMAGE" \
-            -f tests/vm/guest.Containerfile -t syrox-catalog:ci tests/vm
+            -f "$RUNNER_TEMP/catalog-guest.Containerfile" -t syrox-catalog:ci tests/vm
           docker save --output ../.environment/image.tar syrox-catalog:ci
           target/catalog-candidate/catalog-harness --prepare --install-runtime --build-firmware \
             --image-archive "$PWD/../.environment/image.tar" --preparation-image "$(cat ../.environment/image.id)" --profile native

@@ -17,6 +17,7 @@ pub(super) struct Assessment {
 // Reviewed closure of the bootstrap and managed glibc recipes. Keep the core pin
 // and shared construction inputs, but not the catalog index, exports or locks.
 const GLIBC_INPUTS: &[&str] = &[
+    ".github/catalog-guest.Containerfile",
     ".github/qualification-hosts.json",
     ".syrox-core",
     "recipes/builders/process.srx",

@@ -54,6 +54,28 @@ fn build(options: BuildOptions) -> Build {
             builders::process::run(
                 BuildPath::Host("/usr/bin/make"),
                 cwd,
+                [
+                    build_text("test"),
+                    build_text("t=intl/tst-gettext-path-traversal"),
+                    build_text("MSGFMT=/usr/bin/msgfmt")
+                ],
+                [builders::process::env("AWK", build_path(BuildPath::Host("/usr/bin/gawk")))]
+            ),
+            patches::require_pass(
+                "stdlib/tst-strfmon-bug34510",
+                BuildPath::Host("/bin/sh"),
+                cwd,
+                []
+            ),
+            patches::require_pass(
+                "intl/tst-gettext-path-traversal",
+                BuildPath::Host("/bin/sh"),
+                cwd,
+                []
+            ),
+            builders::process::run(
+                BuildPath::Host("/usr/bin/make"),
+                cwd,
                 [build_text("install"), build_text("DESTDIR=/out")],
                 [builders::process::env("AWK", build_path(BuildPath::Host("/usr/bin/gawk")))]
             )

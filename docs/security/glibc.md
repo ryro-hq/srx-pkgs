@@ -1,13 +1,19 @@
 # glibc 2.44 security assessment
 
-The GNU runtime keeps its exact upstream source archive and applies upstream
-commit `b090cf226ff65b913e41536f1f573f500855615c` for CVE-2026-19499. The original
-patch is retained in `assets/glibc/`, authenticated as a project asset and included
-in catalog recipe inputs. Both bootstrap and managed builds apply it with zero
-fuzz and run upstream `tst-strfmon-bug34510` before installation. Managed seeds must
-provide `usr/bin/patch` in their tools output.
+The GNU runtime keeps the exact GNU glibc 2.44 archive and applies two upstream
+fixes. Both patches are authenticated project assets and locked catalog recipe
+inputs. Bootstrap and managed builds apply both with zero fuzz and require
+explicit `PASS` results from upstream `tst-strfmon-bug34510` and
+`tst-gettext-path-traversal` before installation. Managed seeds must provide
+`usr/bin/patch` and `usr/bin/msgfmt` in their tools output.
 
-The first complete catalog matrix exposed these four blocking scanner matches:
+The gettext backport contains the unmodified `intl/` diff from the upstream
+2.44 stable branch at `438677ef498552b28c2060060c9e3947373f1e2c`. It omits only
+the `NEWS` hunk targeting the newer 2.44.1 entry, which is not in the 2.44
+tarball. Reproduce it with `git format-patch --stdout --no-signature --abbrev=8 -1
+438677ef498552b28c2060060c9e3947373f1e2c -- intl/` in the upstream repository.
+
+The assessment covers these scanner matches:
 
 | CVE | Assessment | Upstream evidence |
 | --- | --- | --- |
@@ -15,19 +21,22 @@ The first complete catalog matrix exposed these four blocking scanner matches:
 | CVE-2019-1010023 | Upstream treats running attacker-supplied ELF files through ldd as outside its security guarantees. | [Upstream report](https://sourceware.org/bugzilla/show_bug.cgi?id=22851), [Debian upstream-status record](https://security-tracker.debian.org/tracker/CVE-2019-1010023) |
 | CVE-2026-0861 | Fixed upstream in 2.43; the fix is included in the pinned 2.44 source. | [GLIBC-SA-2026-0001](https://sourceware.org/pipermail/libc-announce/2026/000049.html) |
 | CVE-2026-19499 | Fixed by the retained upstream patch; new GNU qualification must execute its regression. | [Upstream patch](https://sourceware.org/git/?p=glibc.git;a=patch;h=b090cf226ff65b913e41536f1f573f500855615c), [upstream announcement](https://www.openwall.com/lists/oss-security/2026/09/14/31) |
+| CVE-2026-84243 | Fixed by the 2.44 stable gettext backport; new GNU qualification must execute its regression. | [GLIBC-SA-2026-0025](https://sourceware.org/pipermail/libc-announce/2026/000066.html), [stable commit](https://sourceware.org/git/?p=glibc.git;a=commit;h=438677ef498552b28c2060060c9e3947373f1e2c) |
 
 `security/vex/glibc-2.44.openvex.json` records these exact assessments. Its package
-URL includes the SHA256 identity of the patch set, so its fixed statement does
-not address unpatched glibc 2.44. `security/vex/policy.json` binds the document,
-source, patch bytes and exact reviewed glibc recipe inputs (`GLIBC_INPUTS` in
-`tools/xtask/src/release/vex.rs`). Catalog and project locks identify releases
+URL includes the SHA256 identity of the patch set, so its fixed statements do
+not address unpatched or single-patch glibc 2.44. `security/vex/policy.json` binds
+the document, source, patch bytes and exact reviewed glibc recipe inputs
+(`GLIBC_INPUTS` in `tools/xtask/src/release/vex.rs`). Catalog and project locks identify releases
 separately. An unrelated lock change does not renew or invalidate the assessment;
 a change to its recipe, core pin, source or patch context does.
 
-The recorded assessment expired on **2026-11-20**. The scope migration does not
-renew it. The daily audit fails on expiry and dependency-policy reports it
-without using it as a suppression gate. Both warn during the 30 days before
-expiry. See the [maintenance guide](../maintenance.md#renew-a-security-assessment).
+The previous assessment expired on **2026-11-20**. The new policy is scoped to
+the two-patch runtime and expires on **2027-01-13**. It requires human review and
+fresh native qualification before release; the previous qualification does not
+cover these changed inputs. The daily audit fails on expiry and dependency
+policy warns without using expiry as a suppression gate. See the
+[maintenance guide](../maintenance.md#renew-a-security-assessment).
 
 Release preflight also verifies the retained source and patch files, supplies the
 validated, unexpired OpenVEX to Grype and rejects every suppressed match outside the exact
@@ -36,7 +45,7 @@ inspection. Other high, critical or unknown-severity findings continue to block.
 The release retains the VEX document and policy alongside sources, licenses,
 SPDX and checksums.
 
-A scanner compatibility probe on the old bundles retained the strfmon high alert
-after applying only the other three assessments. Those old bundles cannot pass
-the new catalog identity check. Patched bundles require their own full VM matrix;
-the probe is not qualification evidence.
+The scanner recognized the five statements in a synthetic probe with the new
+PURL. On the previous release SBOM it made no suppressions with the new VEX,
+and the old GNU bundles have different catalog identities. Neither scan is
+qualification evidence for the new build.
