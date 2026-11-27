@@ -74,6 +74,7 @@ fn program(options: BuildOptions) -> Build {
                 ],
                 environment(target_compiler())
             ),
+            steps::prepare_gettext_test(options.source_directory),
             builders::process::run(
                 lib::toolchain::tools("usr/bin/make"),
                 cwd,

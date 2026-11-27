@@ -3,7 +3,7 @@
   "profiles": [
     {
       "name": "hello", "versions": ["2.12.1"], "variant": "default", "system": "linux-x86_64-gnu",
-      "recipe_sha256": "466c151cc882e1799d325b1ea74124353ef525fbd85843b0470bb6f02af91937",
+      "recipe_sha256": "d6ffd02d944c502dd0792a8d41de692bfbd1e75849b0ed404e846e447436ae4e",
       "runtime": {"loader": "glibc@2.44", "library_0": "glibc@2.44"},
       "static_host": []
     },
@@ -15,7 +15,7 @@
     },
     {
       "name": "nginx", "versions": ["1.30.5", "1.30.6"], "variant": "minimal", "system": "linux-x86_64-gnu",
-      "recipe_sha256": "51c07b84aad378467f24e4079df6ac912e8f33a52f2a98b9918dfcf1dddad787",
+      "recipe_sha256": "d5dd61f9c409a34520deb22e081c9cae02b402cd6b063c393582fa68c6ca1dce",
       "runtime": {"loader": "glibc@2.44", "library_0": "glibc@2.44"},
       "static_host": []
     },

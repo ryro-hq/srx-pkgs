@@ -51,6 +51,7 @@ fn build(options: BuildOptions) -> Build {
                 [build_text("test"), build_text("t=stdlib/tst-strfmon-bug34510")],
                 [builders::process::env("AWK", build_path(BuildPath::Host("/usr/bin/gawk")))]
             ),
+            steps::prepare_gettext_test(options.source_directory),
             builders::process::run(
                 BuildPath::Host("/usr/bin/make"),
                 cwd,
