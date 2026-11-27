@@ -26,6 +26,18 @@
       ]
     },
     {
+      "name": "nginx",
+      "version": "1.30.8",
+      "license": "BSD-2-Clause",
+      "url": "https://nginx.org/download/nginx-1.30.8.tar.gz",
+      "sha256": "f867314ada32e717b949930859656c48a72dc6657aec598db58af2f98a40e1c1",
+      "purl": "pkg:generic/nginx@1.30.8",
+      "cpe": "cpe:2.3:a:f5:nginx:1.30.8:*:*:*:*:*:*:*",
+      "license_files": [
+        "LICENSE"
+      ]
+    },
+    {
       "name": "hello",
       "version": "2.12.1",
       "license": "GPL-3.0-or-later",

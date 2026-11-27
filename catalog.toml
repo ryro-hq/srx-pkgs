@@ -1,7 +1,8 @@
 schema = 2
+
 [defaults]
-nginx = "1.30.5"
 hello = "2.12.1"
+nginx = "1.30.5"
 
 [[channels]]
 name = "nginx"
@@ -9,9 +10,9 @@ releases = "https://nginx.org/en/download.html"
 origin = "https://nginx.org/"
 archive_prefix = "nginx-"
 archive_suffix = ".tar.gz"
-release_policy = "even-minor"
 signing_key = "D6786CE303D9A9022998DC6CC8464D549AF75C0A"
 key_file = "keys/nginx.asc"
+release_policy = "even-minor"
 
 [[channels]]
 name = "hello"
@@ -19,9 +20,68 @@ releases = "https://ftp.gnu.org/gnu/hello/"
 origin = "https://ftp.gnu.org/"
 archive_prefix = "hello-"
 archive_suffix = ".tar.gz"
-release_policy = "numeric"
 signing_key = "24093F016FFE8602EF449BB84C8EF3DA3FD37230"
 key_file = "keys/hello.asc"
+release_policy = "numeric"
+
+[[releases]]
+name = "hello"
+version = "2.12.1"
+source_url = "https://ftp.gnu.org/gnu/hello/hello-2.12.1.tar.gz"
+source_sha256 = "8d99142afd92576f30b0cd7cb42a8dc6809998bc5d607d88761f512e26c7db20"
+source_maximum_bytes = 2097152
+signature_url = "https://ftp.gnu.org/gnu/hello/hello-2.12.1.tar.gz.sig"
+source = "recipes/packages/hello/releases.srx"
+
+[[releases.combinations]]
+variant = "default"
+system = "linux-x86_64-gnu"
+recipe = "recipes/packages/hello/package.srx"
+factory = "hello"
+export = "hello"
+contract = "recipes/packages/hello/contracts/default.srx"
+contract_type = "Settings"
+qualification = "qualification/hello/checks.toml"
+recipe_inputs = [
+    ".syrox-core",
+    "recipes/support.srx",
+    "recipes/builders/recipe.srx",
+    "recipes/builders/configured.srx",
+    "recipes/builders/process.srx",
+    "recipes/lib/platform.srx",
+    "recipes/packages/hello/variants.srx",
+    "recipes/packages/hello/build.srx",
+    "recipes/lib/gnu.srx",
+    "recipes/builders/autotools.srx",
+    "recipes/packages/glibc/steps.srx",
+    "recipes/packages/glibc/patches.srx",
+    "assets/glibc/CVE-2026-19499.patch",
+    "assets/glibc/CVE-2026-84243.patch",
+    "recipes/packages/glibc/package.srx",
+    "recipes/packages/glibc/releases.srx",
+    "recipes/packages/glibc/build.srx",
+]
+
+[[releases.combinations]]
+variant = "default"
+system = "linux-x86_64-musl"
+recipe = "recipes/packages/hello/package.srx"
+factory = "hello"
+export = "hello"
+contract = "recipes/packages/hello/contracts/default.srx"
+contract_type = "Settings"
+qualification = "qualification/hello/checks.toml"
+recipe_inputs = [
+    ".syrox-core",
+    "recipes/support.srx",
+    "recipes/builders/recipe.srx",
+    "recipes/builders/configured.srx",
+    "recipes/builders/process.srx",
+    "recipes/lib/platform.srx",
+    "recipes/packages/hello/variants.srx",
+    "recipes/packages/hello/build.srx",
+    "recipes/builders/autotools.srx",
+]
 
 [[releases]]
 name = "nginx"
@@ -35,17 +95,17 @@ source = "recipes/packages/nginx/releases.srx"
 [[releases.combinations]]
 variant = "minimal"
 system = "linux-x86_64-gnu"
-factory = "nginx"
-qualification = "qualification/nginx/checks.toml"
 recipe = "recipes/packages/nginx/package.srx"
+factory = "nginx"
 export = "nginx"
 contract = "recipes/packages/nginx/contracts/minimal.srx"
 contract_type = "Settings"
+qualification = "qualification/nginx/checks.toml"
 recipe_inputs = [
     ".syrox-core",
     "recipes/support.srx",
     "recipes/builders/recipe.srx",
-  "recipes/builders/configured.srx",
+    "recipes/builders/configured.srx",
     "recipes/builders/process.srx",
     "recipes/lib/platform.srx",
     "recipes/packages/nginx/variants.srx",
@@ -66,17 +126,17 @@ recipe_inputs = [
 [[releases.combinations]]
 variant = "minimal"
 system = "linux-x86_64-musl"
-factory = "nginx"
-qualification = "qualification/nginx/checks.toml"
 recipe = "recipes/packages/nginx/package.srx"
+factory = "nginx"
 export = "nginx"
 contract = "recipes/packages/nginx/contracts/minimal.srx"
 contract_type = "Settings"
+qualification = "qualification/nginx/checks.toml"
 recipe_inputs = [
     ".syrox-core",
     "recipes/support.srx",
     "recipes/builders/recipe.srx",
-  "recipes/builders/configured.srx",
+    "recipes/builders/configured.srx",
     "recipes/builders/process.srx",
     "recipes/lib/platform.srx",
     "recipes/packages/nginx/variants.srx",
@@ -97,17 +157,17 @@ source = "recipes/packages/nginx/releases.srx"
 [[releases.combinations]]
 variant = "minimal"
 system = "linux-x86_64-gnu"
-factory = "nginx"
-qualification = "qualification/nginx/checks.toml"
 recipe = "recipes/packages/nginx/package.srx"
+factory = "nginx"
 export = "nginx"
 contract = "recipes/packages/nginx/contracts/minimal.srx"
 contract_type = "Settings"
+qualification = "qualification/nginx/checks.toml"
 recipe_inputs = [
     ".syrox-core",
     "recipes/support.srx",
     "recipes/builders/recipe.srx",
-  "recipes/builders/configured.srx",
+    "recipes/builders/configured.srx",
     "recipes/builders/process.srx",
     "recipes/lib/platform.srx",
     "recipes/packages/nginx/variants.srx",
@@ -128,17 +188,17 @@ recipe_inputs = [
 [[releases.combinations]]
 variant = "minimal"
 system = "linux-x86_64-musl"
-factory = "nginx"
-qualification = "qualification/nginx/checks.toml"
 recipe = "recipes/packages/nginx/package.srx"
+factory = "nginx"
 export = "nginx"
 contract = "recipes/packages/nginx/contracts/minimal.srx"
 contract_type = "Settings"
+qualification = "qualification/nginx/checks.toml"
 recipe_inputs = [
     ".syrox-core",
     "recipes/support.srx",
     "recipes/builders/recipe.srx",
-  "recipes/builders/configured.srx",
+    "recipes/builders/configured.srx",
     "recipes/builders/process.srx",
     "recipes/lib/platform.srx",
     "recipes/packages/nginx/variants.srx",
@@ -148,32 +208,34 @@ recipe_inputs = [
 ]
 
 [[releases]]
-name = "hello"
-version = "2.12.1"
-source_url = "https://ftp.gnu.org/gnu/hello/hello-2.12.1.tar.gz"
-source_sha256 = "8d99142afd92576f30b0cd7cb42a8dc6809998bc5d607d88761f512e26c7db20"
+name = "nginx"
+version = "1.30.8"
+source_url = "https://nginx.org/download/nginx-1.30.8.tar.gz"
+source_sha256 = "f867314ada32e717b949930859656c48a72dc6657aec598db58af2f98a40e1c1"
 source_maximum_bytes = 2097152
-signature_url = "https://ftp.gnu.org/gnu/hello/hello-2.12.1.tar.gz.sig"
-source = "recipes/packages/hello/releases.srx"
+signature_url = "https://nginx.org/download/nginx-1.30.8.tar.gz.asc"
+source = "recipes/packages/nginx/releases.srx"
 
 [[releases.combinations]]
-variant = "default"
+variant = "minimal"
 system = "linux-x86_64-gnu"
-factory = "hello"
-qualification = "qualification/hello/checks.toml"
-recipe = "recipes/packages/hello/package.srx"
-export = "hello"
-contract = "recipes/packages/hello/contracts/default.srx"
+recipe = "recipes/packages/nginx/package.srx"
+factory = "nginx"
+export = "nginx"
+contract = "recipes/packages/nginx/contracts/minimal.srx"
 contract_type = "Settings"
+qualification = "qualification/nginx/checks.toml"
 recipe_inputs = [
     ".syrox-core",
     "recipes/support.srx",
     "recipes/builders/recipe.srx",
-  "recipes/builders/configured.srx",
+    "recipes/builders/configured.srx",
     "recipes/builders/process.srx",
     "recipes/lib/platform.srx",
-    "recipes/packages/hello/variants.srx",
-    "recipes/packages/hello/build.srx",
+    "recipes/packages/nginx/variants.srx",
+    "recipes/packages/nginx/build.srx",
+    "recipes/packages/nginx/steps.srx",
+    "recipes/packages/nginx/integration.srx",
     "recipes/lib/gnu.srx",
     "recipes/builders/autotools.srx",
     "recipes/packages/glibc/steps.srx",
@@ -186,22 +248,23 @@ recipe_inputs = [
 ]
 
 [[releases.combinations]]
-variant = "default"
+variant = "minimal"
 system = "linux-x86_64-musl"
-factory = "hello"
-qualification = "qualification/hello/checks.toml"
-recipe = "recipes/packages/hello/package.srx"
-export = "hello"
-contract = "recipes/packages/hello/contracts/default.srx"
+recipe = "recipes/packages/nginx/package.srx"
+factory = "nginx"
+export = "nginx"
+contract = "recipes/packages/nginx/contracts/minimal.srx"
 contract_type = "Settings"
+qualification = "qualification/nginx/checks.toml"
 recipe_inputs = [
     ".syrox-core",
     "recipes/support.srx",
     "recipes/builders/recipe.srx",
-  "recipes/builders/configured.srx",
+    "recipes/builders/configured.srx",
     "recipes/builders/process.srx",
     "recipes/lib/platform.srx",
-    "recipes/packages/hello/variants.srx",
-    "recipes/packages/hello/build.srx",
-    "recipes/builders/autotools.srx",
+    "recipes/packages/nginx/variants.srx",
+    "recipes/packages/nginx/build.srx",
+    "recipes/packages/nginx/steps.srx",
+    "recipes/packages/nginx/integration.srx",
 ]

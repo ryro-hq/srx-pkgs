@@ -14,13 +14,13 @@
       "static_host": ["musl-dev"]
     },
     {
-      "name": "nginx", "versions": ["1.30.5", "1.30.6"], "variant": "minimal", "system": "linux-x86_64-gnu",
+      "name": "nginx", "versions": ["1.30.5", "1.30.6", "1.30.8"], "variant": "minimal", "system": "linux-x86_64-gnu",
       "recipe_sha256": "d5dd61f9c409a34520deb22e081c9cae02b402cd6b063c393582fa68c6ca1dce",
       "runtime": {"loader": "glibc@2.44", "library_0": "glibc@2.44"},
       "static_host": []
     },
     {
-      "name": "nginx", "versions": ["1.30.5", "1.30.6"], "variant": "minimal", "system": "linux-x86_64-musl",
+      "name": "nginx", "versions": ["1.30.5", "1.30.6", "1.30.8"], "variant": "minimal", "system": "linux-x86_64-musl",
       "recipe_sha256": "f816099b1d85a23dc3c067a9dfce4972f503b8bd39f93e104cd7e7ce7fe1b9b1",
       "runtime": {},
       "static_host": ["musl-dev"]
