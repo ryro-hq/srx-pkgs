@@ -1,7 +1,26 @@
-// Upstream b090cf226ff65b913e41536f1f573f500855615c; retain the original patch.
 pub fn apply(source_directory: SourceDirectory, executable: BuildPath, environment: [BuildEnv]) -> [BuildStep] {
-    let patch = BuildPath::Work("CVE-2026-19499.patch");
-    let contents = std::files::read_text("assets/glibc/CVE-2026-19499.patch");
+    apply_one(
+        source_directory,
+        executable,
+        environment,
+        "CVE-2026-19499.patch",
+        std::files::read_text("assets/glibc/CVE-2026-19499.patch")
+    ) ++ apply_one(
+        source_directory,
+        executable,
+        environment,
+        "CVE-2026-84243.patch",
+        std::files::read_text("assets/glibc/CVE-2026-84243.patch")
+    )
+}
+fn apply_one(
+    source_directory: SourceDirectory,
+    executable: BuildPath,
+    environment: [BuildEnv],
+    filename: SourceDirectory,
+    contents: ConfigText
+) -> [BuildStep] {
+    let patch = BuildPath::Work("${filename}");
     [
         BuildStep::Write(BuildFile {
                 path = patch;
@@ -21,4 +40,19 @@ pub fn apply(source_directory: SourceDirectory, executable: BuildPath, environme
             environment
         )
     ]
+}
+// `make test` prints the result but does not require PASS by default.
+pub fn require_pass(test: ConfigText, shell: BuildPath, cwd: BuildPath, environment: [BuildEnv]) -> BuildStep {
+    builders::process::run(
+        shell,
+        cwd,
+        [
+            build_text("-c"),
+            build_text("IFS= read -r result < \"$1\" && [ \"$result\" = \"$2\" ]"),
+            build_text("glibc-test"),
+            build_text("${test}.test-result"),
+            build_text("PASS: ${test}")
+        ],
+        environment
+    )
 }

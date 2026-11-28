@@ -1,0 +1,165 @@
+From 07c14df1341e261a400b37970eca8cfa275854c0 Mon Sep 17 00:00:00 2001
+Subject: nginx 1.30.6 to 1.30.8 source backport (part 2)
+
+Upstream release-to-release diff for src/ and auto/, excluding src/core/nginx.h (version metadata).
+
+diff --git a/src/http/ngx_http_request_body.c b/src/http/ngx_http_request_body.c
+index 93c69220c5322a92026c484679b2cfe2011eeced..6e24131518c6f77447f080f323a5ba9fefa8b6c5 100644
+--- a/src/http/ngx_http_request_body.c
++++ b/src/http/ngx_http_request_body.c
+@@ -307,6 +307,7 @@ ngx_http_do_read_client_request_body(ngx_http_request_t *r)
+     c = r->connection;
+     rb = r->request_body;
+     flush = 1;
++    n = NGX_AGAIN;
+ 
+     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0,
+                    "http read client request body");
+@@ -432,7 +433,7 @@ ngx_http_do_read_client_request_body(ngx_http_request_t *r)
+             break;
+         }
+ 
+-        if (!c->read->ready || rb->rest == 0) {
++        if (n == NGX_AGAIN || !c->read->ready || rb->rest == 0) {
+ 
+             clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
+             ngx_add_timer(c->read, clcf->client_body_timeout);
+diff --git a/src/http/ngx_http_write_filter_module.c b/src/http/ngx_http_write_filter_module.c
+index 9188ee948d36762c9583e72b5c53b560c2824c0b..a16c04a55c50b513cdce2edb0ccfd246356152e4 100644
+--- a/src/http/ngx_http_write_filter_module.c
++++ b/src/http/ngx_http_write_filter_module.c
+@@ -47,7 +47,7 @@ ngx_module_t  ngx_http_write_filter_module = {
+ ngx_int_t
+ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
+ {
+-    off_t                      size, sent, nsent, limit;
++    off_t                      size, sent, psent, nsent, limit;
+     ngx_uint_t                 last, flush, sync;
+     ngx_msec_t                 delay;
+     ngx_chain_t               *cl, *ln, **ll, *chain;
+@@ -308,13 +308,14 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
+ 
+     if (r->limit_rate) {
+ 
++        psent = sent;
+         nsent = c->sent;
+ 
+         if (r->limit_rate_after) {
+ 
+-            sent -= r->limit_rate_after;
+-            if (sent < 0) {
+-                sent = 0;
++            psent -= r->limit_rate_after;
++            if (psent < 0) {
++                psent = 0;
+             }
+ 
+             nsent -= r->limit_rate_after;
+@@ -323,7 +324,7 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
+             }
+         }
+ 
+-        delay = (ngx_msec_t) ((nsent - sent) * 1000 / r->limit_rate);
++        delay = (ngx_msec_t) ((nsent - psent) * 1000 / r->limit_rate);
+ 
+         if (delay > 0) {
+             c->write->delayed = 1;
+@@ -331,7 +332,7 @@ ngx_http_write_filter(ngx_http_request_t *r, ngx_chain_t *in)
+         }
+     }
+ 
+-    if (chain && c->write->ready && !c->write->delayed) {
++    if (chain && c->write->ready && !c->write->delayed && sent != c->sent) {
+         ngx_post_event(c->write, &ngx_posted_next_events);
+     }
+ 
+diff --git a/src/http/v2/ngx_http_v2.c b/src/http/v2/ngx_http_v2.c
+index bea5c88eae4520735174134b25decfcd14fa2882..e5d93733f00d525c92d3c377666ee3735ff8d89b 100644
+--- a/src/http/v2/ngx_http_v2.c
++++ b/src/http/v2/ngx_http_v2.c
+@@ -2484,13 +2484,13 @@ ngx_http_v2_state_window_update(ngx_http_v2_connection_t *h2c, u_char *pos,
+         return ngx_http_v2_state_complete(h2c, pos, end);
+     }
+ 
+-    if (window > NGX_HTTP_V2_MAX_WINDOW - h2c->send_window) {
++    if (window > NGX_HTTP_V2_MAX_WINDOW - h2c->send_window - h2c->send_queued) {
+         ngx_log_error(NGX_LOG_INFO, h2c->connection->log, 0,
+                       "client violated connection flow control: "
+                       "received WINDOW_UPDATE frame "
+                       "with window increment %uz "
+                       "not allowed for window %uz",
+-                      window, h2c->send_window);
++                      window, h2c->send_window + h2c->send_queued);
+ 
+         return ngx_http_v2_connection_error(h2c, NGX_HTTP_V2_FLOW_CTRL_ERROR);
+     }
+@@ -3109,6 +3109,8 @@ ngx_http_v2_create_stream(ngx_http_v2_connection_t *h2c)
+ 
+     h2c->processing++;
+ 
++    ngx_reusable_connection(h2c->connection, 0);
++
+     h2c->priority_limit += h2scf->concurrent_streams;
+ 
+     if (h2c->connection->read->timer_set) {
+diff --git a/src/http/v2/ngx_http_v2.h b/src/http/v2/ngx_http_v2.h
+index beb77a5c1db9eed659fe8719a0fe93e68ca144ad..0c8066e6657696d4eae111c04c10e7c49e905703 100644
+--- a/src/http/v2/ngx_http_v2.h
++++ b/src/http/v2/ngx_http_v2.h
+@@ -137,6 +137,7 @@ struct ngx_http_v2_connection_s {
+     ngx_uint_t                       priority_limit;
+ 
+     size_t                           send_window;
++    size_t                           send_queued;
+     size_t                           recv_window;
+     size_t                           init_window;
+ 
+diff --git a/src/http/v2/ngx_http_v2_filter_module.c b/src/http/v2/ngx_http_v2_filter_module.c
+index 6b73b1e6876915478df765bd65662ec640944fc3..fe235fbd898ab9c52ab47a89bdc56d7deffdb7c3 100644
+--- a/src/http/v2/ngx_http_v2_filter_module.c
++++ b/src/http/v2/ngx_http_v2_filter_module.c
+@@ -1224,6 +1224,7 @@ ngx_http_v2_send_chain(ngx_connection_t *fc, ngx_chain_t *in, off_t limit)
+             ngx_http_v2_queue_frame(h2c, frame);
+ 
+             h2c->send_window -= frame_size;
++            h2c->send_queued += frame_size;
+ 
+             stream->send_window -= frame_size;
+             stream->queued++;
+@@ -1619,6 +1620,7 @@ done:
+     stream->request->header_size += NGX_HTTP_V2_FRAME_HEADER_SIZE;
+ 
+     h2c->payload_bytes += frame->length;
++    h2c->send_queued -= frame->length;
+ 
+     ngx_http_v2_handle_frame(stream, frame);
+ 
+@@ -1753,6 +1755,7 @@ ngx_http_v2_filter_cleanup(void *data)
+     }
+ 
+     h2c->send_window += window;
++    h2c->send_queued -= window;
+ }
+ 
+ 
+diff --git a/src/http/v3/ngx_http_v3_request.c b/src/http/v3/ngx_http_v3_request.c
+index 7bb61311d95e97138687d11fad9cf92cef44ff22..2685af53f717bb07e41080890ab40e0e526eb8c8 100644
+--- a/src/http/v3/ngx_http_v3_request.c
++++ b/src/http/v3/ngx_http_v3_request.c
+@@ -1351,6 +1351,7 @@ ngx_http_v3_do_read_client_request_body(ngx_http_request_t *r)
+     c = r->connection;
+     rb = r->request_body;
+     flush = 1;
++    n = NGX_AGAIN;
+ 
+     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, c->log, 0,
+                    "http3 read client request body");
+@@ -1474,7 +1475,7 @@ ngx_http_v3_do_read_client_request_body(ngx_http_request_t *r)
+             break;
+         }
+ 
+-        if (!c->read->ready || rb->rest == 0) {
++        if (n == NGX_AGAIN || !c->read->ready || rb->rest == 0) {
+ 
+             clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
+             ngx_add_timer(c->read, clcf->client_body_timeout);

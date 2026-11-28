@@ -1,0 +1,88 @@
+{
+  "schema": 2,
+  "expires": "2027-01-13",
+  "document": "security/vex/nginx-1.30.6.openvex.json",
+  "document_sha256": "d22f5fba27a9c74ed2f08586cf9012cf4cdd9f42e6600b54faa7b13a1d209ff6",
+  "recipe_sha256": "c0078429cc6b7bbc36c8559e2085b13a88455f47234f27f434fa48d5b9ab0b7c",
+  "source_sha256": "3cf46f5ed7504d460125866b7bea99fb357f31d887e2e63b35503310e9b8b6c8",
+  "purl": "pkg:generic/nginx@1.30.6?patches=38abeab33cedb28657ff72133ace37c25c72fae0cc4e3b75d11a44f495505c64",
+  "patches": [
+    {
+      "path": "assets/nginx/nginx-1.30.6-to-1.30.8-01.patch",
+      "sha256": "a877ca5908b5ad1d7e8ed79437cf5d2dfff61937754accc9b074016b0100351b",
+      "upstream_commit": "07c14df1341e261a400b37970eca8cfa275854c0",
+      "url": "https://github.com/nginx/nginx/commit/07c14df1341e261a400b37970eca8cfa275854c0"
+    },
+    {
+      "path": "assets/nginx/nginx-1.30.6-to-1.30.8-02.patch",
+      "sha256": "d0228bc0c89cd09b17a158c4a932732fe75f9a101cf7e5343be5fe187fc8ab5b",
+      "upstream_commit": "07c14df1341e261a400b37970eca8cfa275854c0",
+      "url": "https://github.com/nginx/nginx/commit/07c14df1341e261a400b37970eca8cfa275854c0"
+    },
+    {
+      "path": "assets/nginx/nginx-1.30.6-to-1.30.8-03.patch",
+      "sha256": "325307b45887a565371e5e6fe23712713bd9f0c7630ef034193374c97f119615",
+      "upstream_commit": "07c14df1341e261a400b37970eca8cfa275854c0",
+      "url": "https://github.com/nginx/nginx/commit/07c14df1341e261a400b37970eca8cfa275854c0"
+    },
+    {
+      "path": "assets/nginx/nginx-1.30.6-to-1.30.8-04.patch",
+      "sha256": "7cca07aa0d133b300f0055c9f2ea1a4a82832e49a89dc1c065579b499aae259f",
+      "upstream_commit": "07c14df1341e261a400b37970eca8cfa275854c0",
+      "url": "https://github.com/nginx/nginx/commit/07c14df1341e261a400b37970eca8cfa275854c0"
+    },
+    {
+      "path": "assets/nginx/nginx-1.30.6-to-1.30.8-05.patch",
+      "sha256": "3ec9d6f47c98bd153c322f87691dc23613fde6ace45cb9abca93f7da668038a6",
+      "upstream_commit": "07c14df1341e261a400b37970eca8cfa275854c0",
+      "url": "https://github.com/nginx/nginx/commit/07c14df1341e261a400b37970eca8cfa275854c0"
+    }
+  ],
+  "assessments": [
+    {
+      "id": "CVE-2026-113425",
+      "status": "fixed",
+      "evidence": [
+        "https://nginx.org/en/security_advisories.html",
+        "https://nginx.org/en/CHANGES-1.30",
+        "https://nginx.org/download/nginx-1.30.7.tar.gz.asc"
+      ]
+    },
+    {
+      "id": "CVE-2026-121810",
+      "status": "fixed",
+      "evidence": [
+        "https://nginx.org/en/security_advisories.html",
+        "https://nginx.org/en/CHANGES-1.30",
+        "https://nginx.org/download/nginx-1.30.7.tar.gz.asc"
+      ]
+    },
+    {
+      "id": "CVE-2026-123007",
+      "status": "fixed",
+      "evidence": [
+        "https://nginx.org/en/security_advisories.html",
+        "https://nginx.org/en/CHANGES-1.30",
+        "https://nginx.org/download/nginx-1.30.7.tar.gz.asc"
+      ]
+    },
+    {
+      "id": "CVE-2026-123633",
+      "status": "fixed",
+      "evidence": [
+        "https://nginx.org/en/security_advisories.html",
+        "https://nginx.org/en/CHANGES-1.30",
+        "https://nginx.org/download/nginx-1.30.7.tar.gz.asc"
+      ]
+    },
+    {
+      "id": "CVE-2026-123634",
+      "status": "fixed",
+      "evidence": [
+        "https://nginx.org/en/security_advisories.html",
+        "https://nginx.org/en/CHANGES-1.30",
+        "https://nginx.org/download/nginx-1.30.7.tar.gz.asc"
+      ]
+    }
+  ]
+}

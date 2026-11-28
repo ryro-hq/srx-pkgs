@@ -1,0 +1,129 @@
+From fb0e979c6dd63c018958b41eeb844947c5c21264 Mon Sep 17 00:00:00 2001
+Subject: nginx 1.30.5 to 1.30.6 source backport (part 8)
+
+Upstream release-to-release diff for src/ and auto/, excluding src/core/nginx.h (version metadata).
+
+diff --git a/src/mail/ngx_mail_pop3_handler.c b/src/mail/ngx_mail_pop3_handler.c
+index 226e7419bd45bfb272a59a598390185d26743404..64835282c829a76c29c80b33753d7d7c8740452f 100644
+--- a/src/mail/ngx_mail_pop3_handler.c
++++ b/src/mail/ngx_mail_pop3_handler.c
+@@ -69,6 +69,7 @@ ngx_mail_pop3_init_session(ngx_mail_session_t *s, ngx_connection_t *c)
+ 
+     if (ngx_handle_read_event(c->read, 0) != NGX_OK) {
+         ngx_mail_close_connection(c);
++        return;
+     }
+ 
+     ngx_mail_send(c->write);
+diff --git a/src/mail/ngx_mail_proxy_module.c b/src/mail/ngx_mail_proxy_module.c
+index 84a7f61a4aa6de4c57d79ad97500467b20ba7b21..aa3baeb7e3caa571abb7b60c7d48adffdcb9e5a3 100644
+--- a/src/mail/ngx_mail_proxy_module.c
++++ b/src/mail/ngx_mail_proxy_module.c
+@@ -894,6 +894,7 @@ ngx_mail_proxy_write_handler(ngx_event_t *wev)
+ 
+     if (ngx_handle_write_event(wev, 0) != NGX_OK) {
+         ngx_mail_proxy_internal_server_error(s);
++        return;
+     }
+ 
+     if (c->read->ready) {
+diff --git a/src/mail/ngx_mail_smtp_handler.c b/src/mail/ngx_mail_smtp_handler.c
+index 97bbd70631a4baa089689666119adf15f15b2342..8158c4fa1f55680147d31605c397914adca2b909 100644
+--- a/src/mail/ngx_mail_smtp_handler.c
++++ b/src/mail/ngx_mail_smtp_handler.c
+@@ -340,6 +340,7 @@ ngx_mail_smtp_greeting(ngx_mail_session_t *s, ngx_connection_t *c)
+ 
+     if (ngx_handle_read_event(c->read, 0) != NGX_OK) {
+         ngx_mail_close_connection(c);
++        return;
+     }
+ 
+     if (c->read->ready) {
+diff --git a/src/os/unix/ngx_channel.c b/src/os/unix/ngx_channel.c
+index 1efa0667cb86e645b2b55b99c32b0bd1a61e2213..b03bbbb153348c88ac3b0ba0ea73c23b987d08f8 100644
+--- a/src/os/unix/ngx_channel.c
++++ b/src/os/unix/ngx_channel.c
+@@ -134,6 +134,13 @@ ngx_read_channel(ngx_socket_t s, ngx_channel_t *ch, size_t size, ngx_log_t *log)
+         }
+ 
+         ngx_log_error(NGX_LOG_ALERT, log, err, "recvmsg() failed");
++
++        if (err == NGX_EMSGSIZE || err == NGX_EMFILE) {
++            /* file descriptor table is full */
++            ngx_memzero(ch, size);
++            return 0;
++        }
++
+         return NGX_ERROR;
+     }
+ 
+@@ -152,27 +159,29 @@ ngx_read_channel(ngx_socket_t s, ngx_channel_t *ch, size_t size, ngx_log_t *log)
+ 
+     if (ch->command == NGX_CMD_OPEN_CHANNEL) {
+ 
+-        if (cmsg.cm.cmsg_len < (socklen_t) CMSG_LEN(sizeof(int))) {
++        if (msg.msg_controllen < (socklen_t) CMSG_LEN(sizeof(int))) {
+             ngx_log_error(NGX_LOG_ALERT, log, 0,
+                           "recvmsg() returned too small ancillary data");
+-            return NGX_ERROR;
+-        }
++            ch->fd = -1;
+ 
+-        if (cmsg.cm.cmsg_level != SOL_SOCKET || cmsg.cm.cmsg_type != SCM_RIGHTS)
++        } else if (cmsg.cm.cmsg_level != SOL_SOCKET
++                   || cmsg.cm.cmsg_type != SCM_RIGHTS)
+         {
+             ngx_log_error(NGX_LOG_ALERT, log, 0,
+                           "recvmsg() returned invalid ancillary data "
+                           "level %d or type %d",
+                           cmsg.cm.cmsg_level, cmsg.cm.cmsg_type);
+             return NGX_ERROR;
+-        }
+ 
+-        /* ch->fd = *(int *) CMSG_DATA(&cmsg.cm); */
++        } else {
+ 
+-        ngx_memcpy(&ch->fd, CMSG_DATA(&cmsg.cm), sizeof(int));
++            /* ch->fd = *(int *) CMSG_DATA(&cmsg.cm); */
++
++            ngx_memcpy(&ch->fd, CMSG_DATA(&cmsg.cm), sizeof(int));
++        }
+     }
+ 
+-    if (msg.msg_flags & (MSG_TRUNC|MSG_CTRUNC)) {
++    if (msg.msg_flags & MSG_TRUNC) {
+         ngx_log_error(NGX_LOG_ALERT, log, 0,
+                       "recvmsg() truncated data");
+     }
+@@ -183,10 +192,11 @@ ngx_read_channel(ngx_socket_t s, ngx_channel_t *ch, size_t size, ngx_log_t *log)
+         if (msg.msg_accrightslen != sizeof(int)) {
+             ngx_log_error(NGX_LOG_ALERT, log, 0,
+                           "recvmsg() returned no ancillary data");
+-            return NGX_ERROR;
+-        }
++            ch->fd = -1;
+ 
+-        ch->fd = fd;
++        } else {
++            ch->fd = fd;
++        }
+     }
+ 
+ #endif
+diff --git a/src/os/unix/ngx_process_cycle.c b/src/os/unix/ngx_process_cycle.c
+index 5bc5ce9792df0d251b6a9dc943a0f2370335f4ca..33c25487bdada3d7a6bbd338a11983a427b7d247 100644
+--- a/src/os/unix/ngx_process_cycle.c
++++ b/src/os/unix/ngx_process_cycle.c
+@@ -1073,6 +1073,12 @@ ngx_channel_handler(ngx_event_t *ev)
+                            ch.slot, ch.pid, ngx_processes[ch.slot].pid,
+                            ngx_processes[ch.slot].channel[0]);
+ 
++            if (ngx_processes[ch.slot].channel[0] == -1
++                || ngx_processes[ch.slot].pid != ch.pid)
++            {
++                break;
++            }
++
+             if (close(ngx_processes[ch.slot].channel[0]) == -1) {
+                 ngx_log_error(NGX_LOG_ALERT, ev->log, ngx_errno,
+                               "close() channel failed");

@@ -1,0 +1,129 @@
+From fb0e979c6dd63c018958b41eeb844947c5c21264 Mon Sep 17 00:00:00 2001
+Subject: nginx 1.30.5 to 1.30.6 source backport (part 4)
+
+Upstream release-to-release diff for src/ and auto/, excluding src/core/nginx.h (version metadata).
+
+diff --git a/src/http/modules/ngx_http_proxy_v2_module.c b/src/http/modules/ngx_http_proxy_v2_module.c
+index ae6007298fc94f9a89f241cc1ce588e38fc1e4d3..7ce358e3d843c583647a682421326b2c4a42211e 100644
+--- a/src/http/modules/ngx_http_proxy_v2_module.c
++++ b/src/http/modules/ngx_http_proxy_v2_module.c
+@@ -160,6 +160,7 @@ static ngx_http_proxy_v2_ctx_t *
+     ngx_http_proxy_v2_get_ctx(ngx_http_request_t *r);
+ static ngx_int_t ngx_http_proxy_v2_get_connection_data(ngx_http_request_t *r,
+     ngx_http_proxy_v2_ctx_t *ctx, ngx_peer_connection_t *pc);
++static ngx_inline ngx_int_t ngx_http_proxy_v2_cached(ngx_http_request_t *r);
+ static void ngx_http_proxy_v2_cleanup(void *data);
+ 
+ static void ngx_http_proxy_v2_abort_request(ngx_http_request_t *r);
+@@ -1499,7 +1500,7 @@ ngx_http_proxy_v2_process_header(ngx_http_request_t *r)
+ 
+         /* frame payload */
+ 
+-        if (u->peer.connection) {
++        if (!ngx_http_proxy_v2_cached(r)) {
+ 
+             if (ctx->type == NGX_HTTP_V2_RST_STREAM_FRAME) {
+                 rc = ngx_http_proxy_v2_parse_rst_stream(r, ctx, b);
+@@ -4162,9 +4163,7 @@ ngx_http_proxy_v2_get_connection_data(ngx_http_request_t *r,
+     ngx_connection_t    *c;
+     ngx_pool_cleanup_t  *cln;
+ 
+-    c = pc->connection;
+-
+-    if (c == NULL) {
++    if (ngx_http_proxy_v2_cached(r)) {
+         ctx->connection = ngx_palloc(r->pool, sizeof(ngx_http_proxy_v2_conn_t));
+         if (ctx->connection == NULL) {
+             return NGX_ERROR;
+@@ -4175,6 +4174,8 @@ ngx_http_proxy_v2_get_connection_data(ngx_http_request_t *r,
+         goto done;
+     }
+ 
++    c = pc->connection;
++
+     if (pc->cached) {
+ 
+         /*
+@@ -4230,6 +4231,17 @@ done:
+ }
+ 
+ 
++static ngx_inline ngx_int_t
++ngx_http_proxy_v2_cached(ngx_http_request_t *r)
++{
++#if (NGX_HTTP_CACHE)
++    return r->cached;
++#else
++    return 0;
++#endif
++}
++
++
+ static void
+ ngx_http_proxy_v2_cleanup(void *data)
+ {
+diff --git a/src/http/modules/ngx_http_slice_filter_module.c b/src/http/modules/ngx_http_slice_filter_module.c
+index 67dc14c8249d2b98fd09d3709b03fe9314a9af6a..97f808ee54905111fcda9a15e60b8a57e58199e6 100644
+--- a/src/http/modules/ngx_http_slice_filter_module.c
++++ b/src/http/modules/ngx_http_slice_filter_module.c
+@@ -428,6 +428,10 @@ ngx_http_slice_range_variable(ngx_http_request_t *r,
+ 
+         ctx->start = slcf->size * (ngx_http_slice_get_start(r) / slcf->size);
+ 
++        if (ctx->start > NGX_MAX_OFF_T_VALUE - (off_t) slcf->size) {
++            ctx->start = 0;
++        }
++
+         ctx->range.data = p;
+         ctx->range.len = ngx_sprintf(p, "bytes=%O-%O", ctx->start,
+                                      ctx->start + (off_t) slcf->size - 1)
+diff --git a/src/http/modules/ngx_http_xslt_filter_module.c b/src/http/modules/ngx_http_xslt_filter_module.c
+index 4e6e1b99d243e6b34bae80418b17d55c6e81662c..f9996f763c4a7f86144f3061de04f602a039c8bc 100644
+--- a/src/http/modules/ngx_http_xslt_filter_module.c
++++ b/src/http/modules/ngx_http_xslt_filter_module.c
+@@ -263,6 +263,10 @@ ngx_http_xslt_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
+ 
+         if (ngx_http_xslt_add_chunk(r, ctx, cl->buf) != NGX_OK) {
+ 
++            if (ctx->ctxt == NULL) {
++                return ngx_http_xslt_send(r, ctx, NULL);
++            }
++
+             if (ctx->ctxt->myDoc) {
+ 
+ #if (NGX_HTTP_XSLT_REUSE_DTD)
+@@ -465,7 +469,7 @@ ngx_http_xslt_sax_error(void *data, const char *msg, ...)
+ {
+     xmlParserCtxtPtr ctxt = data;
+ 
+-    size_t                       n;
++    int                          n;
+     va_list                      args;
+     ngx_http_xslt_filter_ctx_t  *ctx;
+     u_char                       buf[NGX_MAX_ERROR_STR];
+@@ -475,13 +479,23 @@ ngx_http_xslt_sax_error(void *data, const char *msg, ...)
+     buf[0] = '\0';
+ 
+     va_start(args, msg);
+-    n = (size_t) vsnprintf((char *) buf, NGX_MAX_ERROR_STR, msg, args);
++    n = vsnprintf((char *) buf, NGX_MAX_ERROR_STR, msg, args);
+     va_end(args);
+ 
++    if (n <= 0) {
++        ngx_log_error(NGX_LOG_ERR, ctx->request->connection->log, ngx_errno,
++                      "libxml2 error");
++        return;
++    }
++
++    if (n > NGX_MAX_ERROR_STR) {
++        n = NGX_MAX_ERROR_STR;
++    }
++
+     while (--n && (buf[n] == CR || buf[n] == LF)) { /* void */ }
+ 
+     ngx_log_error(NGX_LOG_ERR, ctx->request->connection->log, 0,
+-                  "libxml2 error: \"%*s\"", n + 1, buf);
++                  "libxml2 error: \"%*s\"", (size_t) (n + 1), buf);
+ }
+ 
+ 

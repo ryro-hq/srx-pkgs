@@ -18,4 +18,8 @@ jobs:
         with:
           command: check
       - name: Validate time-bounded policy exceptions
+        if: '!cancelled()'
         run: cargo xtask security exceptions
+      - name: Report scoped VEX expiry
+        if: '!cancelled()'
+        run: cargo xtask security vex-status

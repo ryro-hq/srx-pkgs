@@ -33,8 +33,8 @@ pub(super) fn today() -> Result<String> {
     Ok(format!("{year:04}-{month:02}-{day:02}"))
 }
 
-pub(super) fn unexpired(expires: &str, today: &str) -> bool {
-    let bytes = expires.as_bytes();
+fn civil_day(date: &str) -> Option<i64> {
+    let bytes = date.as_bytes();
     if bytes.len() != 10
         || bytes[4] != b'-'
         || bytes[7] != b'-'
@@ -43,25 +43,123 @@ pub(super) fn unexpired(expires: &str, today: &str) -> bool {
             .enumerate()
             .all(|(index, byte)| index == 4 || index == 7 || byte.is_ascii_digit())
     {
-        return false;
+        return None;
     }
-    let Ok(year) = expires[..4].parse::<u32>() else {
-        return false;
-    };
-    let Ok(month) = expires[5..7].parse::<u32>() else {
-        return false;
-    };
-    let Ok(day) = expires[8..].parse::<u32>() else {
-        return false;
-    };
+    let year = date[..4].parse::<i64>().ok().filter(|year| *year > 0)?;
+    let month = date[5..7].parse::<i64>().ok()?;
+    let day = date[8..].parse::<i64>().ok()?;
     let maximum = match month {
         1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
         4 | 6 | 9 | 11 => 30,
         2 if year % 4 == 0 && (year % 100 != 0 || year % 400 == 0) => 29,
         2 => 28,
-        _ => return false,
+        _ => return None,
     };
-    day > 0 && day <= maximum && expires > today
+    if day == 0 || day > maximum {
+        return None;
+    }
+    let y = year - i64::from(month <= 2);
+    let era = y / 400;
+    let yoe = y % 400;
+    let m = month + if month > 2 { -3 } else { 9 };
+    Some(era * 146_097 + yoe * 365 + yoe / 4 - yoe / 100 + (153 * m + 2) / 5 + day - 1)
+}
+
+fn remaining(expires: &str, today: &str) -> Result<i64> {
+    civil_day(expires)
+        .zip(civil_day(today))
+        .map(|(end, now)| end - now)
+        .ok_or_else(|| "invalid UTC security policy date (expected YYYY-MM-DD)".into())
+}
+
+const WARNING_DAYS: i64 = 30;
+
+pub(super) fn expiry(label: &str, expires: &str, today: &str, required: bool) -> Result {
+    let days = remaining(expires, today)?;
+    if days <= 0 {
+        let message = format!("{label}: expired on {expires} UTC; run cargo xtask security renew");
+        if required {
+            return Err(message.into());
+        }
+        eprintln!("warning: {message}");
+    } else if days <= WARNING_DAYS {
+        eprintln!("warning: {label}: expires in {days} day(s) on {expires} UTC");
+    }
+    Ok(())
+}
+
+pub(super) fn renewal_fields(
+    previous: &serde_json::Value,
+    date: &str,
+    evidence: &str,
+    today: &str,
+) -> Result {
+    let previous = previous.as_str().ok_or("missing prior expiry")?;
+    if !(1..=90).contains(&remaining(date, today)?) || remaining(date, previous)? <= 0 {
+        return Err(
+            "renewal must extend the existing expiry and end within 90 days of today".into(),
+        );
+    }
+    if !evidence.starts_with("https://")
+        || evidence.len() <= "https://".len()
+        || evidence.len() > 1024
+        || evidence
+            .bytes()
+            .any(|b| b.is_ascii_whitespace() || b.is_ascii_control())
+    {
+        return Err("renewal requires an HTTPS link to the new review evidence".into());
+    }
+    Ok(())
+}
+
+fn exception_id(record: &Value) -> Result<String> {
+    match record["kind"].as_str() {
+        Some("advisory") => Ok(record["id"]
+            .as_str()
+            .ok_or("exception lacks advisory id")?
+            .into()),
+        Some("license") => Ok(format!(
+            "{}@{}",
+            record["package"]
+                .as_str()
+                .ok_or("exception lacks package")?,
+            record["version"]
+                .as_str()
+                .ok_or("exception lacks exact version")?
+        )),
+        _ => Err("unsupported exception kind".into()),
+    }
+}
+
+pub(super) fn renew(kind: &str, id: &str, date: &str, evidence: &str) -> Result {
+    if kind == "vex" {
+        return crate::release::renew_vex(id, date, evidence);
+    }
+    if !matches!(kind, "advisory" | "license") {
+        return Err("renewal kind must be vex, advisory or license".into());
+    }
+    let mut document: Value = serde_json::from_slice(&fs::read("security/exceptions.json")?)?;
+    let records = document["exceptions"]
+        .as_array_mut()
+        .ok_or("missing exception inventory")?;
+    let mut found = None;
+    for record in records {
+        if record["kind"] == kind && exception_id(record)? == id {
+            if found.is_some() {
+                return Err("duplicate exception identity; resolve manually".into());
+            }
+            found = Some(record);
+        }
+    }
+    let record = found.ok_or("no existing scoped exception matches")?;
+    let now = today()?;
+    renewal_fields(&record["expires"], date, evidence, &now)?;
+    eprintln!("Review the current reason, owner and exact cargo-deny scope: {record}");
+    record["expires"] = date.into();
+    record["renewal_evidence"] = evidence.into();
+    eprintln!("Review against security/exceptions.json and submit via PR; no files changed.");
+    println!("{}", serde_json::to_string_pretty(&document)?);
+    Ok(())
 }
 
 pub(super) fn exceptions() -> Result {
@@ -74,8 +172,14 @@ pub(super) fn exceptions() -> Result {
     for record in records {
         let expires = record["expires"].as_str().ok_or("exception lacks expiry")?;
         let reason = record["reason"].as_str().ok_or("exception lacks reason")?;
-        if !unexpired(expires, &today) || reason.len() < 30 || record["owner"].as_str().is_none() {
-            return Err("expired or unexplained security exception".into());
+        let id = exception_id(record)?;
+        let owner = record["owner"]
+            .as_str()
+            .filter(|owner| !owner.trim().is_empty())
+            .ok_or("exception lacks owner")?;
+        expiry(&format!("exception {id} ({owner})"), expires, &today, true)?;
+        if reason.len() < 30 {
+            return Err("unexplained security exception".into());
         }
         match record["kind"].as_str() {
             Some("advisory") => {
@@ -150,7 +254,6 @@ pub(super) fn exceptions() -> Result {
         }
     }
     println!("{} scoped policy exceptions are unexpired", records.len());
-    crate::release::check_vex_review()?;
     Ok(())
 }
 
@@ -372,7 +475,8 @@ pub(super) fn workflows() -> Result {
         }
     }
     super::run("shellcheck", &["--version"])?;
-    super::run("actionlint", &[])
+    super::run("actionlint", &[])?;
+    super::run("bash", &[".github/scripts/test-publication-preflight.sh"])
 }
 
 #[cfg(test)]
@@ -388,9 +492,21 @@ mod tests {
             "zzzz-zz-zz",
             "2026-01-01",
         ] {
-            assert!(!unexpired(invalid, "2026-01-01"));
+            assert!(expiry("fixture", invalid, "2026-01-01", true).is_err());
         }
-        assert!(unexpired("2028-02-29", "2026-01-01"));
+        assert!(expiry("fixture", "2028-02-29", "2026-01-01", true).is_ok());
+        assert!(expiry("fixture", "2026-01-01", "2026-01-01", false).is_ok());
+        assert_eq!(remaining("2028-03-01", "2028-02-28").unwrap(), 2);
+        assert_eq!(remaining("2027-01-01", "2026-12-31").unwrap(), 1);
+    }
+    #[test]
+    fn renewal_requires_new_evidence_and_limits_the_extension() {
+        let old = Value::from("2026-11-20");
+        let url = "https://example.org/review";
+        assert!(renewal_fields(&old, "2026-12-20", url, "2026-11-26").is_ok());
+        assert!(renewal_fields(&old, "2027-11-26", url, "2026-11-26").is_err());
+        assert!(renewal_fields(&old, "2026-11-20", url, "2026-11-01").is_err());
+        assert!(renewal_fields(&old, "2026-12-20", "missing", "2026-11-26").is_err());
     }
     #[test]
     fn scopes_and_documentation_classification_are_conservative() {

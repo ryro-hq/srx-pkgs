@@ -7,7 +7,7 @@ pub fn gnu(source: support::Source) -> Recipe {
                 builders::process::argument("--with-cc=", BuildPath::Work("cc")),
                 lib::gnu::environment(),
                 lib::gnu::configure_environment(),
-                lib::gnu::setup(),
+                patches::apply(source.version, BuildPath::Host("/usr/bin/patch"), []) ++ lib::gnu::setup(),
                 []
             );
             build_inputs = builders::recipe::selected_inputs([
@@ -26,7 +26,7 @@ pub fn musl(source: support::Source) -> Recipe {
                 build_text("--with-cc=/usr/bin/musl-gcc"),
                 [],
                 [],
-                [],
+                patches::apply(source.version, BuildPath::Host("/usr/bin/patch"), []),
                 [build_text("--with-ld-opt=-static")]
             );
             commands = [Command {

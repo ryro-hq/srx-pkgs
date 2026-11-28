@@ -1,0 +1,238 @@
+From fb0e979c6dd63c018958b41eeb844947c5c21264 Mon Sep 17 00:00:00 2001
+Subject: nginx 1.30.5 to 1.30.6 source backport (part 5)
+
+Upstream release-to-release diff for src/ and auto/, excluding src/core/nginx.h (version metadata).
+
+diff --git a/src/http/modules/perl/nginx.xs b/src/http/modules/perl/nginx.xs
+index fd59e29ea1066ea4ecd9fee92667f945e320f8cf..efbab280a70731a0805a1ecee6f71c9fdf2501cf 100644
+--- a/src/http/modules/perl/nginx.xs
++++ b/src/http/modules/perl/nginx.xs
+@@ -18,6 +18,9 @@
+ #define ngx_http_perl_set_request(r, ctx)                                     \
+                                                                               \
+     ctx = INT2PTR(ngx_http_perl_ctx_t *, SvIV((SV *) SvRV(ST(0))));           \
++    if (ctx != ngx_http_perl_active_context || ctx == NULL) {                 \
++        croak("invalid request object");                                      \
++    }                                                                         \
+     r = ctx->request
+ 
+ 
+@@ -41,16 +44,6 @@ ngx_http_perl_sv2str(pTHX_ ngx_http_request_t *r, ngx_str_t *s, SV *sv)
+     p = (u_char *) SvPV(sv, len);
+ 
+     s->len = len;
+-
+-    if (SvREADONLY(sv) && SvPOK(sv)) {
+-        s->data = p;
+-
+-        ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+-                       "perl sv2str: %08XD \"%V\"", sv->sv_flags, s);
+-
+-        return NGX_OK;
+-    }
+-
+     s->data = ngx_pnalloc(r->pool, len);
+     if (s->data == NULL) {
+         return NGX_ERROR;
+@@ -65,6 +58,29 @@ ngx_http_perl_sv2str(pTHX_ ngx_http_request_t *r, ngx_str_t *s, SV *sv)
+ }
+ 
+ 
++static ngx_int_t
++ngx_http_perl_refcount(pTHX_ ngx_http_request_t *r, SV *sv)
++{
++    ngx_pool_cleanup_t       *cln;
++    ngx_http_perl_cleanup_t  *clnp;
++
++    cln = ngx_pool_cleanup_add(r->pool, sizeof(ngx_http_perl_cleanup_t));
++    if (cln == NULL) {
++        return NGX_ERROR;
++    }
++
++    cln->handler = ngx_http_perl_refcount_cleanup;
++
++    clnp = cln->data;
++    clnp->request = r;
++    clnp->sv = sv;
++
++    SvREFCNT_inc(sv);
++
++    return NGX_OK;
++}
++
++
+ static ngx_int_t
+ ngx_http_perl_output(ngx_http_request_t *r, ngx_http_perl_ctx_t *ctx,
+     ngx_buf_t *b)
+@@ -395,6 +411,7 @@ has_request_body(r, next)
+     dXSTARG;
+     ngx_http_request_t   *r;
+     ngx_http_perl_ctx_t  *ctx;
++    SV                   *next;
+     ngx_int_t             rc;
+ 
+     ngx_http_perl_set_request(r, ctx);
+@@ -411,7 +428,19 @@ has_request_body(r, next)
+         XSRETURN_UNDEF;
+     }
+ 
+-    ctx->next = SvRV(ST(1));
++    next = ST(1);
++
++    if (!SvROK(next) || SvTYPE(SvRV(next)) != SVt_PVCV) {
++        croak("has_request_body(): no handler provided");
++    }
++
++    ctx->next = SvRV(next);
++
++    if (ngx_http_perl_refcount(aTHX_ r, ctx->next) != NGX_OK) {
++        ctx->error = 1;
++        ctx->next = NULL;
++        croak("ngx_http_perl_refcount() failed");
++    }
+ 
+     r->request_body_in_single_buf = 1;
+     r->request_body_in_persistent_file = 1;
+@@ -663,7 +692,7 @@ print(r, ...)
+     if (items == 2) {
+ 
+         /*
+-         * do zero copy for prolate single read-only SV:
++         * single read-only SV:
+          *     $r->print("some text\n");
+          */
+ 
+@@ -681,6 +710,11 @@ print(r, ...)
+                 XSRETURN_EMPTY;
+             }
+ 
++            if (ngx_http_perl_refcount(aTHX_ r, sv) != NGX_OK) {
++                ctx->error = 1;
++                croak("ngx_http_perl_refcount() failed");
++            }
++
+             b = ngx_calloc_buf(r->pool);
+             if (b == NULL) {
+                 ctx->error = 1;
+@@ -1129,6 +1163,7 @@ sleep(r, sleep, next)
+ 
+     ngx_http_request_t   *r;
+     ngx_http_perl_ctx_t  *ctx;
++    SV                   *next;
+     ngx_msec_t            sleep;
+ 
+     ngx_http_perl_set_request(r, ctx);
+@@ -1146,7 +1181,19 @@ sleep(r, sleep, next)
+     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                    "perl sleep: %M", sleep);
+ 
+-    ctx->next = SvRV(ST(2));
++    next = ST(2);
++
++    if (!SvROK(next) || SvTYPE(SvRV(next)) != SVt_PVCV) {
++        croak("sleep(): no handler provided");
++    }
++
++    ctx->next = SvRV(next);
++
++    if (ngx_http_perl_refcount(aTHX_ r, ctx->next) != NGX_OK) {
++        ctx->error = 1;
++        ctx->next = NULL;
++        croak("ngx_http_perl_refcount() failed");
++    }
+ 
+     r->connection->write->delayed = 1;
+     ngx_add_timer(r->connection->write, sleep);
+diff --git a/src/http/modules/perl/ngx_http_perl_module.c b/src/http/modules/perl/ngx_http_perl_module.c
+index f3fc629477ff11f7105bdcc835a5401d5b2b5a61..300cd5e0a4b98b7f2f7fbc0d6cfa31c0484be525 100644
+--- a/src/http/modules/perl/ngx_http_perl_module.c
++++ b/src/http/modules/perl/ngx_http_perl_module.c
+@@ -148,6 +148,9 @@ static ngx_http_ssi_command_t  ngx_http_perl_ssi_command = {
+ #endif
+ 
+ 
++ngx_http_perl_ctx_t     *ngx_http_perl_active_context;
++
++
+ static ngx_str_t         ngx_null_name = ngx_null_string;
+ static HV               *nginx_stash;
+ 
+@@ -308,6 +311,29 @@ ngx_http_perl_sleep_handler(ngx_http_request_t *r)
+ }
+ 
+ 
++void
++ngx_http_perl_refcount_cleanup(void *data)
++{
++    ngx_http_perl_cleanup_t  *clnp = data;
++
++    ngx_http_request_t         *r;
++    ngx_http_perl_main_conf_t  *pmcf;
++
++    r = clnp->request;
++    pmcf = ngx_http_get_module_main_conf(r, ngx_http_perl_module);
++
++    {
++
++    dTHXa(pmcf->perl);
++    PERL_SET_CONTEXT(pmcf->perl);
++    PERL_SET_INTERP(pmcf->perl);
++
++    SvREFCNT_dec(clnp->sv);
++
++    }
++}
++
++
+ static ngx_int_t
+ ngx_http_perl_variable(ngx_http_request_t *r, ngx_http_variable_value_t *v,
+     uintptr_t data)
+@@ -723,6 +749,8 @@ ngx_http_perl_call_handler(pTHX_ ngx_http_request_t *r,
+ 
+     PUSHMARK(sp);
+ 
++    ngx_http_perl_active_context = ctx;
++
+     sv = sv_2mortal(sv_bless(newRV_noinc(newSViv(PTR2IV(ctx))), nginx));
+     XPUSHs(sv);
+ 
+@@ -767,6 +795,8 @@ ngx_http_perl_call_handler(pTHX_ ngx_http_request_t *r,
+     FREETMPS;
+     LEAVE;
+ 
++    ngx_http_perl_active_context = NULL;
++
+     if (ctx->error) {
+ 
+         ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0,
+diff --git a/src/http/modules/perl/ngx_http_perl_module.h b/src/http/modules/perl/ngx_http_perl_module.h
+index 8fa59a4c5dac0607159deacee18c6c0d0c7ca6c6..2747389a93063d30f1799ba3dd664a22635382fd 100644
+--- a/src/http/modules/perl/ngx_http_perl_module.h
++++ b/src/http/modules/perl/ngx_http_perl_module.h
+@@ -50,9 +50,18 @@ typedef struct {
+ } ngx_http_perl_var_t;
+ 
+ 
++typedef struct {
++    ngx_http_request_t       *request;
++    SV                       *sv;
++} ngx_http_perl_cleanup_t;
++
++
+ extern ngx_module_t  ngx_http_perl_module;
+ 
+ 
++extern ngx_http_perl_ctx_t  *ngx_http_perl_active_context;
++
++
+ /*
+  * workaround for "unused variable `Perl___notused'" warning
+  * when building with perl 5.6.1
+@@ -68,6 +77,7 @@ extern void boot_DynaLoader(pTHX_ CV* cv);
+ 
+ void ngx_http_perl_handle_request(ngx_http_request_t *r);
+ void ngx_http_perl_sleep_handler(ngx_http_request_t *r);
++void ngx_http_perl_refcount_cleanup(void *data);
+ 
+ 
+ #endif /* _NGX_HTTP_PERL_MODULE_H_INCLUDED_ */

@@ -125,7 +125,7 @@ jobs:
         id: vm-cache
         with:
           path: .environment
-          key: catalog-vm-${{ matrix.host }}-linux-6.12.109-${{ hashFiles('.syrox-core', '.github/qualification-hosts.json', 'tools/xtask/src/qualification.rs', '.core/tests/vm/*.Containerfile', '.core/crates/syrox/tests/vm_support/prepare.rs') }}
+          key: catalog-vm-${{ matrix.host }}-linux-6.12.109-${{ hashFiles('.syrox-core', '.github/qualification-hosts.json', '.github/catalog-guest.Containerfile', 'tools/xtask/src/qualification.rs', '.core/tests/vm/*.Containerfile', '.core/crates/syrox/tests/vm_support/prepare.rs') }}
       - name: Build the isolated Linux environment
         if: steps.vm-cache.outputs.cache-hit != 'true'
         working-directory: .core
@@ -135,12 +135,13 @@ jobs:
           QUALIFICATION_HOST: ${{ matrix.host }}
         run: |
           mkdir -p ../.environment
+          cat tests/vm/guest.Containerfile ../.github/catalog-guest.Containerfile > "$RUNNER_TEMP/catalog-guest.Containerfile"
           docker buildx create --name catalog-environment --driver docker-container \
             --driver-opt cpu-period=100000,cpu-quota=200000,memory=4g,memory-swap=4g
           docker buildx build --builder catalog-environment --load --iidfile ../.environment/image.id \
             --build-arg RUST_IMAGE=rust@sha256:4cd829461bd5c4d511c32e269da9cb8929223b666519d8004e35fc8d1d771ab7 \
             --build-arg BASE_IMAGE="$BASE_IMAGE" \
-            -f tests/vm/guest.Containerfile -t syrox-catalog:ci tests/vm
+            -f "$RUNNER_TEMP/catalog-guest.Containerfile" -t syrox-catalog:ci tests/vm
           docker save --output ../.environment/image.tar syrox-catalog:ci
           target/catalog-candidate/catalog-harness --prepare --install-runtime --build-firmware \
             --image-archive "$PWD/../.environment/image.tar" --preparation-image "$(cat ../.environment/image.id)" --profile native
@@ -148,10 +149,12 @@ jobs:
           cp target/vm-runtime/landlock/{libkrunfw.so.5.6.1,provenance.json} ../.environment/
           (cd .. && cargo xtask security tools --output "$RUNNER_TEMP/srx-tools" --tool syft)
           "$RUNNER_TEMP/srx-tools/syft" scan docker-archive:../.environment/image.tar -o spdx-json=../.environment/host.spdx.json
+          docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges --user 65534:65534 \
+            --entrypoint /usr/bin/cat "$(cat ../.environment/image.id)" /etc/os-release > ../.environment/host-os-release
           docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges --user 65534:65534             --entrypoint /usr/bin/cat "$(cat ../.environment/image.id)" /usr/share/doc/musl/copyright > ../.environment/musl-copyright
           (cd .. && cargo xtask qualification record "$QUALIFICATION_HOST" .environment)
           cd ../.environment
-          sha256sum image.tar image.id msb libkrunfw.so.5.6.1 provenance.json "host-$QUALIFICATION_HOST.json" host.spdx.json musl-copyright > SHA256SUMS
+          sha256sum image.tar image.id msb libkrunfw.so.5.6.1 provenance.json "host-$QUALIFICATION_HOST.json" host.spdx.json host-os-release musl-copyright > SHA256SUMS
       - name: Release the bounded image builder
         if: always() && steps.vm-cache.outputs.cache-hit != 'true'
         run: docker buildx rm --force catalog-environment
@@ -178,6 +181,7 @@ jobs:
           path: |
             .environment/host-${{ matrix.host }}.json
             .environment/host.spdx.json
+            .environment/host-os-release
             .environment/musl-copyright
           include-hidden-files: true
           if-no-files-found: error
@@ -206,11 +210,6 @@ jobs:
           test -c /dev/kvm
           sudo chown "$(id -u):$(id -g)" /dev/kvm
           sudo chmod 660 /dev/kvm
-      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
-        id: store-cache
-        with:
-          path: .store
-          key: store-${{ matrix.host }}-${{ matrix.system }}-${{ matrix.identity }}-${{ hashFiles('.syrox-core', '.environment/SHA256SUMS') }}
       - name: Configure exact source permissions
         run: |
           {
@@ -225,18 +224,16 @@ jobs:
           QUALIFICATION_HOST: ${{ matrix.host }}
           SYROX_VM_CONFIG: ${{ github.workspace }}/.environment/job.json
         run: |
+          # A restored Store can contain materialized views the guest rejects.
+          # Keep the metadata checks: qualify each row in a fresh private Store.
+          store=$(mktemp -d "${RUNNER_TEMP:?}/srx-catalog-store.XXXXXXXX")
           target/catalog-candidate/catalog-harness --prepare \
             --image-archive "$PWD/../.environment/image.tar" \
             --runtime "$PWD/../.environment/msb" --firmware "$PWD/../.environment/libkrunfw.so.5.6.1" \
             --profile native --candidate-bundle "$PWD/target/catalog-candidate"
           target/catalog-candidate/catalog-harness --qualify-catalog \
-            "$PWD/.." "$IDENTITY" "$PWD/../build.toml" "$PWD/../.store" "$PWD/../.evidence"
+            "$PWD/.." "$IDENTITY" "$PWD/../build.toml" "$store" "$PWD/../.evidence"
           cp ../.evidence/qualification-vm.json "../.evidence/results/$IDENTITY.$QUALIFICATION_HOST.vm.json"
-      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
-        if: github.ref == 'refs/heads/main' && steps.store-cache.outputs.cache-hit != 'true'
-        with:
-          path: .store
-          key: ${{ steps.store-cache.outputs.cache-primary-key }}
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
@@ -279,6 +276,7 @@ jobs:
           QUALIFICATION_HOST: ${{ matrix.host }}
         run: |
           mv .release/host.spdx.json ".release/host-$QUALIFICATION_HOST.spdx.json"
+          mv .release/host-os-release ".release/host-$QUALIFICATION_HOST.os-release"
           mv .release/musl-copyright ".release/musl-$QUALIFICATION_HOST.copyright"
       - name: Require every combination and bind it to this guest environment
         env:
@@ -301,6 +299,7 @@ jobs:
             .release/qualification-${{ matrix.host }}.json
             .release/host-${{ matrix.host }}.json
             .release/host-${{ matrix.host }}.spdx.json
+            .release/host-${{ matrix.host }}.os-release
             .release/musl-${{ matrix.host }}.copyright
             .release/*.${{ matrix.host }}.vm.json
           include-hidden-files: true
@@ -368,6 +367,10 @@ jobs:
     needs: [changes, verify]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-24.04
+    environment: catalog-publication
+    defaults:
+      run:
+        shell: bash
     permissions:
       contents: write
       attestations: write
@@ -376,13 +379,24 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+      - name: Require immutable releases before processing publication assets
+        env:
+          GH_TOKEN: ${{ secrets.CATALOG_IMMUTABILITY_READ_TOKEN }}
+        run: bash .github/scripts/require-immutable-releases.sh
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: release
           path: .release
       - name: Verify release bytes and archive the complete payload
         run: |
-          (cd .release && sha256sum --check SHA256SUMS)
+          (
+            cd .release
+            test -z "$(find . -mindepth 1 ! -type f ! -type d -print -quit)"
+            while IFS= read -r -d '' file; do
+              sha256sum -- "${file#./}"
+            done < <(find . -type f ! -path ./SHA256SUMS -print0 | LC_ALL=C sort -z)
+          ) > "$RUNNER_TEMP/SHA256SUMS.computed"
+          cmp .release/SHA256SUMS "$RUNNER_TEMP/SHA256SUMS.computed"
           tar -czf catalog-payload.tar.gz -C .release .
           sha256sum catalog-payload.tar.gz > catalog-payload.tar.gz.sha256
       - name: Bind release bytes to the trusted publishing workflow
@@ -399,7 +413,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           tag="catalog-$GITHUB_SHA"
-          test "$(gh api "repos/$GITHUB_REPOSITORY/immutable-releases" --jq .enabled)" = true
           gh attestation verify catalog-payload.tar.gz --repo "$GITHUB_REPOSITORY" \
             --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/catalog.yml" --source-digest "$GITHUB_SHA"
           gh attestation trusted-root > trusted_root.jsonl
@@ -411,8 +424,37 @@ jobs:
               --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/catalog.yml" \
               --source-digest "$GITHUB_SHA" --predicate-type "$predicate" --deny-self-hosted-runners
           done
-          gh release create "$tag" --target "$GITHUB_SHA" --draft --title "$tag" \
+          cp "sha256:$digest.jsonl" attestations.jsonl
+          assets=(catalog-payload.tar.gz catalog-payload.tar.gz.sha256 attestations.jsonl trusted_root.jsonl
+                  .release/sbom.spdx.json .release/grype.json .release/SHA256SUMS Catalog.lock Syrox.lock catalog.toml)
+          existing_tag=$(git ls-remote --tags origin "refs/tags/$tag")
+          test -z "$existing_tag"
+          gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --draft --title "$tag" \
             --notes 'Native GNU/musl qualification in pinned Debian and Ubuntu userspaces on Linux 6.12.109. Canonical Debian bundles, separate userspace manifests, pinned upstream provenance and offline runtime checks.' \
-            catalog-payload.tar.gz catalog-payload.tar.gz.sha256 "sha256:$digest.jsonl" trusted_root.jsonl .release/sbom.spdx.json .release/grype.json .release/SHA256SUMS Catalog.lock Syrox.lock catalog.toml
-          gh release edit "$tag" --draft=false
-          test "$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" --jq .immutable)" = true
+            "${assets[@]}"
+          draft_url=$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json apiUrl,isDraft --jq \
+            'select(.isDraft == true) | .apiUrl')
+          draft=${draft_url#"https://api.github.com/repos/$GITHUB_REPOSITORY/releases/"}
+          [[ "$draft" =~ ^[0-9]+$ ]]
+          gh api "repos/$GITHUB_REPOSITORY/releases/$draft" > "$RUNNER_TEMP/catalog-draft.json"
+          jq -e --arg target "$GITHUB_SHA" --arg tag "$tag" --argjson count "${#assets[@]}" \
+            '.draft and .target_commitish == $target and .tag_name == $tag and (.assets | length == $count)' \
+            "$RUNNER_TEMP/catalog-draft.json"
+          for asset in "${assets[@]}"; do
+            hash=$(sha256sum "$asset" | cut -d' ' -f1)
+            jq -e --arg name "${asset##*/}" --arg digest "sha256:$hash" \
+              '[.assets[] | select(.name == $name and .state == "uploaded" and .digest == $digest)] | length == 1' \
+              "$RUNNER_TEMP/catalog-draft.json"
+          done
+      - name: Recheck immutability before undrafting
+        env:
+          GH_TOKEN: ${{ secrets.CATALOG_IMMUTABILITY_READ_TOKEN }}
+        run: bash .github/scripts/require-immutable-releases.sh
+      - name: Publish the checked draft and verify the immutable result
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="catalog-$GITHUB_SHA"
+          gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" --jq '.immutable == true and .draft == false' | grep -qx true
+          test "$(gh api "repos/$GITHUB_REPOSITORY/commits/$tag" --jq .sha)" = "$GITHUB_SHA"

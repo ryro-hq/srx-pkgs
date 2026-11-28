@@ -9,6 +9,13 @@ case "$name" in ld.so) ;; *.a|*.o|*.so) if test -L "$path"; then cp -L -- "$path
 done
 sed -i "s|$PREFIX_OUT/usr/lib/libc_nonshared.a|$PREFIX_DEV/usr/lib/libc_nonshared.a|g" "$DEV/usr/lib/libc.so"
 """;
+// Mirror the upstream gen-gconv-modules rule for the single gettext test.
+pub fn prepare_gettext_test(source_directory: SourceDirectory) -> BuildStep {
+    BuildStep::Copy(
+        BuildPath::Work("source/${source_directory}/iconvdata/gconv-modules"),
+        BuildPath::Work("build/iconvdata/gconv-modules")
+    )
+}
 pub fn finish(cwd: BuildPath, shell: BuildPath, environment: [BuildEnv]) -> [BuildStep] {
     let locale = builders::process::run(
         BuildPath::Output("out", "usr/lib/ld-linux-x86-64.so.2"),

@@ -43,6 +43,7 @@ cargo xtask check
 ```
 
 See [authoring](docs/recipes.md), [testing](docs/testing.md),
+[package maintenance and review](docs/maintenance.md),
 [contributing](CONTRIBUTING.md), and [security policy](SECURITY.md).
 
 ## Repository structure

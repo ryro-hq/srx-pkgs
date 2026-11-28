@@ -1,0 +1,129 @@
+From fb0e979c6dd63c018958b41eeb844947c5c21264 Mon Sep 17 00:00:00 2001
+Subject: nginx 1.30.5 to 1.30.6 source backport (part 9)
+
+Upstream release-to-release diff for src/ and auto/, excluding src/core/nginx.h (version metadata).
+
+diff --git a/src/stream/ngx_stream_geo_module.c b/src/stream/ngx_stream_geo_module.c
+index 316de92869d82c3a831548f2de923b34a46569ee..88d9d723cb25bbee772f6a1ce7c08baca66f6edb 100644
+--- a/src/stream/ngx_stream_geo_module.c
++++ b/src/stream/ngx_stream_geo_module.c
+@@ -1349,7 +1349,6 @@ ngx_stream_geo_include_binary_base(ngx_conf_t *cf,
+     time_t                        mtime;
+     size_t                        size, len;
+     ssize_t                       n;
+-    uint32_t                      crc32;
+     ngx_err_t                     err;
+     ngx_int_t                     rc;
+     ngx_uint_t                    i;
+@@ -1444,7 +1443,31 @@ ngx_stream_geo_include_binary_base(ngx_conf_t *cf,
+         goto failed;
+     }
+ 
+-    ngx_crc32_init(crc32);
++    /*
++     * the base is walked below without bounds checking, so make sure
++     * it is intact first: the checksum in the header is computed over
++     * the entire body, which the walk covers contiguously
++     */
++
++    if (size < sizeof(ngx_stream_geo_header_t)
++               + sizeof(ngx_stream_variable_value_t)
++               + 0x10000 * sizeof(ngx_stream_geo_range_t *))
++    {
++        ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
++                           "truncated binary geo range base \"%s\"",
++                           name->data);
++        goto failed;
++    }
++
++    if (ngx_crc32_long(base + sizeof(ngx_stream_geo_header_t),
++                       size - sizeof(ngx_stream_geo_header_t))
++        != header->crc32)
++    {
++        ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
++                           "CRC32 mismatch in binary geo range base \"%s\"",
++                           name->data);
++        goto failed;
++    }
+ 
+     vv = (ngx_stream_variable_value_t *)
+             (base + sizeof(ngx_stream_geo_header_t));
+@@ -1452,18 +1475,14 @@ ngx_stream_geo_include_binary_base(ngx_conf_t *cf,
+     while (vv->data) {
+         len = ngx_align(sizeof(ngx_stream_variable_value_t) + vv->len,
+                         sizeof(void *));
+-        ngx_crc32_update(&crc32, (u_char *) vv, len);
+         vv->data += (size_t) base;
+         vv = (ngx_stream_variable_value_t *) ((u_char *) vv + len);
+     }
+-    ngx_crc32_update(&crc32, (u_char *) vv,
+-                     sizeof(ngx_stream_variable_value_t));
+     vv++;
+ 
+     ranges = (ngx_stream_geo_range_t **) vv;
+ 
+     for (i = 0; i < 0x10000; i++) {
+-        ngx_crc32_update(&crc32, (u_char *) &ranges[i], sizeof(void *));
+         if (ranges[i]) {
+             ranges[i] = (ngx_stream_geo_range_t *)
+                             ((u_char *) ranges[i] + (size_t) base);
+@@ -1474,24 +1493,13 @@ ngx_stream_geo_include_binary_base(ngx_conf_t *cf,
+ 
+     while ((u_char *) range < base + size) {
+         while (range->value) {
+-            ngx_crc32_update(&crc32, (u_char *) range,
+-                             sizeof(ngx_stream_geo_range_t));
+             range->value = (ngx_stream_variable_value_t *)
+                                ((u_char *) range->value + (size_t) base);
+             range++;
+         }
+-        ngx_crc32_update(&crc32, (u_char *) range, sizeof(void *));
+         range = (ngx_stream_geo_range_t *) ((u_char *) range + sizeof(void *));
+     }
+ 
+-    ngx_crc32_final(crc32);
+-
+-    if (crc32 != header->crc32) {
+-        ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
+-                  "CRC32 mismatch in binary geo range base \"%s\"", name->data);
+-        goto failed;
+-    }
+-
+     ngx_conf_log_error(NGX_LOG_NOTICE, cf, 0,
+                        "using binary geo range base \"%s\"", name->data);
+ 
+diff --git a/src/stream/ngx_stream_script.c b/src/stream/ngx_stream_script.c
+index 559b8b9fb2b03d57f215a1d9799cae7f5068688b..4ae10d5ce1c89f306e9ec729739a20f6002cfb24 100644
+--- a/src/stream/ngx_stream_script.c
++++ b/src/stream/ngx_stream_script.c
+@@ -157,7 +157,9 @@ ngx_stream_compile_complex_value(ngx_stream_compile_complex_value_t *ccv)
+ 
+     for (i = 0; i < v->len; i++) {
+         if (v->data[i] == '$') {
+-            if (v->data[i + 1] >= '1' && v->data[i + 1] <= '9') {
++            if (i + 1 < v->len
++                && v->data[i + 1] >= '1' && v->data[i + 1] <= '9')
++            {
+                 nc++;
+ 
+             } else {
+@@ -519,7 +521,7 @@ ngx_stream_script_run(ngx_stream_session_t *s, ngx_str_t *value,
+     e.session = s;
+     e.flushed = 1;
+ 
+-    n = len;
++    n = 0;
+ 
+     while (*(uintptr_t *) e.ip) {
+         lcode = *(ngx_stream_script_len_code_pt *) e.ip;
+@@ -527,8 +529,8 @@ ngx_stream_script_run(ngx_stream_session_t *s, ngx_str_t *value,
+     }
+ 
+ 
+-    value->len = n;
+-    value->data = ngx_pnalloc(s->connection->pool, n);
++    value->len = n + len;
++    value->data = ngx_pnalloc(s->connection->pool, n + len);
+     if (value->data == NULL) {
+         return NULL;
+     }

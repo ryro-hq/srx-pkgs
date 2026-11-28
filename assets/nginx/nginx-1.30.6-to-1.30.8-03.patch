@@ -1,0 +1,171 @@
+From 07c14df1341e261a400b37970eca8cfa275854c0 Mon Sep 17 00:00:00 2001
+Subject: nginx 1.30.6 to 1.30.8 source backport (part 3)
+
+Upstream release-to-release diff for src/ and auto/, excluding src/core/nginx.h (version metadata).
+
+diff --git a/src/mail/ngx_mail_auth_http_module.c b/src/mail/ngx_mail_auth_http_module.c
+index 3e5095a2d226b25c50f20acffe652956200d5e76..130ee37d2dd122cc630b6e752d6d7bd463f068df 100644
+--- a/src/mail/ngx_mail_auth_http_module.c
++++ b/src/mail/ngx_mail_auth_http_module.c
+@@ -70,6 +70,7 @@ static void ngx_mail_auth_sleep_handler(ngx_event_t *rev);
+ static ngx_int_t ngx_mail_auth_http_parse_header_line(ngx_mail_session_t *s,
+     ngx_mail_auth_http_ctx_t *ctx);
+ static void ngx_mail_auth_http_block_read(ngx_event_t *rev);
++static void ngx_mail_auth_http_block_write(ngx_event_t *wev);
+ static void ngx_mail_auth_http_dummy_handler(ngx_event_t *ev);
+ static ngx_buf_t *ngx_mail_auth_http_create_request(ngx_mail_session_t *s,
+     ngx_pool_t *pool, ngx_mail_auth_http_conf_t *ahcf);
+@@ -216,7 +217,10 @@ ngx_mail_auth_http_init(ngx_mail_session_t *s)
+     ctx->peer.connection->data = s;
+     ctx->peer.connection->pool = s->connection->pool;
+ 
++    s->out.len = 0;
++
+     s->connection->read->handler = ngx_mail_auth_http_block_read;
++    s->connection->write->handler = ngx_mail_auth_http_block_write;
+     ctx->peer.connection->read->handler = ngx_mail_auth_http_read_handler;
+     ctx->peer.connection->write->handler = ngx_mail_auth_http_write_handler;
+ 
+@@ -688,6 +692,8 @@ ngx_mail_auth_http_process_headers(ngx_mail_session_t *s,
+ 
+             ngx_close_connection(ctx->peer.connection);
+ 
++            s->connection->write->handler = ngx_mail_send;
++
+             if (ctx->err.len) {
+ 
+                 ngx_log_error(NGX_LOG_INFO, s->connection->log, 0,
+@@ -1120,6 +1126,29 @@ ngx_mail_auth_http_block_read(ngx_event_t *rev)
+ }
+ 
+ 
++static void
++ngx_mail_auth_http_block_write(ngx_event_t *wev)
++{
++    ngx_connection_t          *c;
++    ngx_mail_session_t        *s;
++    ngx_mail_auth_http_ctx_t  *ctx;
++
++    ngx_log_debug0(NGX_LOG_DEBUG_MAIL, wev->log, 0,
++                   "mail auth http block write");
++
++    if (ngx_handle_write_event(wev, 0) != NGX_OK) {
++        c = wev->data;
++        s = c->data;
++
++        ctx = ngx_mail_get_module_ctx(s, ngx_mail_auth_http_module);
++
++        ngx_close_connection(ctx->peer.connection);
++        ngx_destroy_pool(ctx->pool);
++        ngx_mail_session_internal_server_error(s);
++    }
++}
++
++
+ static void
+ ngx_mail_auth_http_dummy_handler(ngx_event_t *ev)
+ {
+diff --git a/src/mail/ngx_mail_handler.c b/src/mail/ngx_mail_handler.c
+index a88e6c28737dab14f4d22bc4edef4296740dfe63..c167360ca3486f9deef7938ea2c07f9fa3db3faa 100644
+--- a/src/mail/ngx_mail_handler.c
++++ b/src/mail/ngx_mail_handler.c
+@@ -14,6 +14,7 @@
+ static void ngx_mail_proxy_protocol_handler(ngx_event_t *rev);
+ static void ngx_mail_init_session_handler(ngx_event_t *rev);
+ static void ngx_mail_init_session(ngx_connection_t *c);
++static void ngx_mail_block_read(ngx_event_t *rev);
+ 
+ #if (NGX_MAIL_SSL)
+ static void ngx_mail_ssl_init_connection(ngx_ssl_t *ssl, ngx_connection_t *c);
+@@ -415,8 +416,6 @@ ngx_mail_verify_cert(ngx_mail_session_t *s, ngx_connection_t *c)
+         s->out = cscf->protocol->cert_error;
+         s->quit = 1;
+ 
+-        c->write->handler = ngx_mail_send;
+-
+         ngx_mail_send(s->connection->write);
+         return NGX_ERROR;
+     }
+@@ -436,8 +435,6 @@ ngx_mail_verify_cert(ngx_mail_session_t *s, ngx_connection_t *c)
+             s->out = cscf->protocol->no_cert;
+             s->quit = 1;
+ 
+-            c->write->handler = ngx_mail_send;
+-
+             ngx_mail_send(s->connection->write);
+             return NGX_ERROR;
+         }
+@@ -824,6 +821,11 @@ again:
+ 
+     ngx_add_timer(c->write, cscf->timeout);
+ 
++    if (s->quit) {
++        c->read->handler = ngx_mail_block_read;
++        c->write->handler = ngx_mail_send;
++    }
++
+     if (ngx_handle_write_event(c->write, 0) != NGX_OK) {
+         ngx_mail_close_connection(c);
+         return;
+@@ -942,6 +944,17 @@ ngx_mail_session_internal_server_error(ngx_mail_session_t *s)
+ }
+ 
+ 
++static void
++ngx_mail_block_read(ngx_event_t *rev)
++{
++    ngx_log_debug0(NGX_LOG_DEBUG_MAIL, rev->log, 0, "mail block read");
++
++    if (ngx_handle_read_event(rev, 0) != NGX_OK) {
++        ngx_mail_close_connection(rev->data);
++    }
++}
++
++
+ void
+ ngx_mail_close_connection(ngx_connection_t *c)
+ {
+diff --git a/src/mail/ngx_mail_proxy_module.c b/src/mail/ngx_mail_proxy_module.c
+index aa3baeb7e3caa571abb7b60c7d48adffdcb9e5a3..b3560e21fa13c5d3676745eff07921a721402aaf 100644
+--- a/src/mail/ngx_mail_proxy_module.c
++++ b/src/mail/ngx_mail_proxy_module.c
+@@ -24,6 +24,7 @@ typedef struct {
+ 
+ 
+ static void ngx_mail_proxy_block_read(ngx_event_t *rev);
++static void ngx_mail_proxy_block_write(ngx_event_t *wev);
+ static void ngx_mail_proxy_pop3_handler(ngx_event_t *rev);
+ static void ngx_mail_proxy_imap_handler(ngx_event_t *rev);
+ static void ngx_mail_proxy_smtp_handler(ngx_event_t *rev);
+@@ -165,6 +166,7 @@ ngx_mail_proxy_init(ngx_mail_session_t *s, ngx_addr_t *peer)
+     p->upstream.connection->pool = s->connection->pool;
+ 
+     s->connection->read->handler = ngx_mail_proxy_block_read;
++    s->connection->write->handler = ngx_mail_proxy_block_write;
+     p->upstream.connection->write->handler = ngx_mail_proxy_write_handler;
+ 
+     pcf = ngx_mail_get_module_srv_conf(s, ngx_mail_proxy_module);
+@@ -223,6 +225,23 @@ ngx_mail_proxy_block_read(ngx_event_t *rev)
+ }
+ 
+ 
++static void
++ngx_mail_proxy_block_write(ngx_event_t *wev)
++{
++    ngx_connection_t    *c;
++    ngx_mail_session_t  *s;
++
++    ngx_log_debug0(NGX_LOG_DEBUG_MAIL, wev->log, 0, "mail proxy block write");
++
++    if (ngx_handle_write_event(wev, 0) != NGX_OK) {
++        c = wev->data;
++        s = c->data;
++
++        ngx_mail_proxy_close_session(s);
++    }
++}
++
++
+ static void
+ ngx_mail_proxy_pop3_handler(ngx_event_t *rev)
+ {

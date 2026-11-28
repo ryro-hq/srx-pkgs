@@ -1,0 +1,106 @@
+{
+  "@context": "https://openvex.dev/ns/v0.2.0",
+  "@id": "https://github.com/ryro-hq/srx-pkgs/blob/main/security/vex/nginx-1.30.5.openvex.json",
+  "author": "ryro-hq/srx-pkgs",
+  "timestamp": "2026-11-27T17:29:53Z",
+  "version": 1,
+  "statements": [
+    {
+      "vulnerability": {
+        "name": "CVE-2026-113425"
+      },
+      "products": [
+        {
+          "@id": "pkg:generic/nginx@1.30.5?patches=1e3e9f5c9a683a19528431c4c537e4ca3553ddadd9a1d38db1e135702f08e7cb"
+        }
+      ],
+      "status": "fixed",
+      "status_notes": "Upstream lists this fix in nginx 1.30.7. The applied backport makes src/ and auto/ byte-identical to the signed nginx 1.30.8 source except src/core/nginx.h, which retains version metadata. This assertion covers only the authenticated patch set and locked build recipes."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-121810"
+      },
+      "products": [
+        {
+          "@id": "pkg:generic/nginx@1.30.5?patches=1e3e9f5c9a683a19528431c4c537e4ca3553ddadd9a1d38db1e135702f08e7cb"
+        }
+      ],
+      "status": "fixed",
+      "status_notes": "Upstream lists this fix in nginx 1.30.7. The applied backport makes src/ and auto/ byte-identical to the signed nginx 1.30.8 source except src/core/nginx.h, which retains version metadata. This assertion covers only the authenticated patch set and locked build recipes."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-123007"
+      },
+      "products": [
+        {
+          "@id": "pkg:generic/nginx@1.30.5?patches=1e3e9f5c9a683a19528431c4c537e4ca3553ddadd9a1d38db1e135702f08e7cb"
+        }
+      ],
+      "status": "fixed",
+      "status_notes": "Upstream lists this fix in nginx 1.30.7. The applied backport makes src/ and auto/ byte-identical to the signed nginx 1.30.8 source except src/core/nginx.h, which retains version metadata. This assertion covers only the authenticated patch set and locked build recipes."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-123633"
+      },
+      "products": [
+        {
+          "@id": "pkg:generic/nginx@1.30.5?patches=1e3e9f5c9a683a19528431c4c537e4ca3553ddadd9a1d38db1e135702f08e7cb"
+        }
+      ],
+      "status": "fixed",
+      "status_notes": "Upstream lists this fix in nginx 1.30.7. The applied backport makes src/ and auto/ byte-identical to the signed nginx 1.30.8 source except src/core/nginx.h, which retains version metadata. This assertion covers only the authenticated patch set and locked build recipes."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-123634"
+      },
+      "products": [
+        {
+          "@id": "pkg:generic/nginx@1.30.5?patches=1e3e9f5c9a683a19528431c4c537e4ca3553ddadd9a1d38db1e135702f08e7cb"
+        }
+      ],
+      "status": "fixed",
+      "status_notes": "Upstream lists this fix in nginx 1.30.7. The applied backport makes src/ and auto/ byte-identical to the signed nginx 1.30.8 source except src/core/nginx.h, which retains version metadata. This assertion covers only the authenticated patch set and locked build recipes."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-15176"
+      },
+      "products": [
+        {
+          "@id": "pkg:generic/nginx@1.30.5?patches=1e3e9f5c9a683a19528431c4c537e4ca3553ddadd9a1d38db1e135702f08e7cb"
+        }
+      ],
+      "status": "fixed",
+      "status_notes": "Upstream lists this fix in nginx 1.30.6. The applied backport makes src/ and auto/ byte-identical to the signed nginx 1.30.8 source except src/core/nginx.h, which retains version metadata. This assertion covers only the authenticated patch set and locked build recipes."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-93479"
+      },
+      "products": [
+        {
+          "@id": "pkg:generic/nginx@1.30.5?patches=1e3e9f5c9a683a19528431c4c537e4ca3553ddadd9a1d38db1e135702f08e7cb"
+        }
+      ],
+      "status": "fixed",
+      "status_notes": "Upstream lists this fix in nginx 1.30.6. The applied backport makes src/ and auto/ byte-identical to the signed nginx 1.30.8 source except src/core/nginx.h, which retains version metadata. This assertion covers only the authenticated patch set and locked build recipes."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-97205"
+      },
+      "products": [
+        {
+          "@id": "pkg:generic/nginx@1.30.5?patches=1e3e9f5c9a683a19528431c4c537e4ca3553ddadd9a1d38db1e135702f08e7cb"
+        }
+      ],
+      "status": "fixed",
+      "status_notes": "Upstream lists this fix in nginx 1.30.6. The applied backport makes src/ and auto/ byte-identical to the signed nginx 1.30.8 source except src/core/nginx.h, which retains version metadata. This assertion covers only the authenticated patch set and locked build recipes."
+    }
+  ],
+  "role": "Document Creator"
+}

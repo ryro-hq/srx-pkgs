@@ -86,13 +86,21 @@ fn suite(name: &str) -> Result {
         "projections" => projections::check(),
         "examples" => examples::check(),
         "authoring" => projections::authoring(),
+        "scaffolds" => projections::extended_scaffolds(),
         "all" => {
             projections::check()?;
             projections::authoring()?;
+            if srx(&["catalog", "new", "--help"])?.contains("prebuilt") {
+                projections::extended_scaffolds()?;
+            } else {
+                println!(
+                    "extended scaffolds require a newer core (run --suite scaffolds with that binary)"
+                );
+            }
             examples::check()?;
             run("cargo", &["test", "--locked", "-p", "xtask"])
         }
-        _ => Err("suite must be all, projections, authoring or examples".into()),
+        _ => Err("suite must be all, projections, authoring, scaffolds or examples".into()),
     }
 }
 fn execute() -> Result {
@@ -103,13 +111,23 @@ fn execute() -> Result {
         ["check"] => {
             run("cargo", &["fmt", "--all", "--", "--check"])?; format(false)?;
             for args in [["catalog", "generate", ".", "--check"].as_slice(), &["catalog", "check", "."], &["catalog", "lock", ".", "--check"]] { print!("{}", srx(args)?); }
+            release::nginx_patch_module(false)?;
+            release::check_dependency_profiles()?;
             suite("all")
         }
         ["fmt"] => { run("cargo", &["fmt", "--all"])?; format(true) }
         ["test", "--suite", name] => suite(name),
         ["examples", "k3s", "--output", destination] => examples::prepare(Path::new(destination)),
         ["qualification", command, rest @ ..] => qualification::execute(command, rest),
+        ["evidence", rest @ ..] => release::package_evidence(rest),
         ["security", "exceptions"] => policy::exceptions(),
+        ["security", "vex-status"] => release::vex_status(false),
+        ["security", "vex-scope"] => release::vex_scope(),
+        ["security", "nginx-patch-module", "--write"] => release::nginx_patch_module(true),
+        ["security", "dependency-scopes"] => release::dependency_scopes(),
+        ["security", "vex-status", "--require-current"] => release::vex_status(true),
+        ["security", "renew"] => Err("use cargo xtask security renew vex|advisory|license EXACT_ID YYYY-MM-DD HTTPS_REVIEW_URL".into()),
+        ["security", "renew", kind, id, expiry, evidence] => policy::renew(kind, id, expiry, evidence),
         ["security", "workflows"] => policy::workflows(),
         ["security", "tools", "--output", directory] => policy::tools(Path::new(directory), "all"),
         ["security", "tools", "--output", directory, "--tool", name] => policy::tools(Path::new(directory), name),

@@ -1,0 +1,53 @@
+{
+  "schema": 1,
+  "profiles": [
+    {
+      "name": "hello", "versions": ["2.12.1"], "variant": "default", "system": "linux-x86_64-gnu",
+      "recipe_sha256": "d6ffd02d944c502dd0792a8d41de692bfbd1e75849b0ed404e846e447436ae4e",
+      "runtime": {"loader": "glibc@2.44", "library_0": "glibc@2.44"},
+      "static_host": []
+    },
+    {
+      "name": "hello", "versions": ["2.12.1"], "variant": "default", "system": "linux-x86_64-musl",
+      "recipe_sha256": "10c0318d75ef5b732b99cb8351f88234f69b40e7fca87afd22da68040d2f7528",
+      "runtime": {},
+      "static_host": ["musl-dev"]
+    },
+    {
+      "name": "nginx", "versions": ["1.30.5"], "variant": "minimal", "system": "linux-x86_64-gnu",
+      "recipe_sha256": "f622cc286b47e5222612041727a1d7af357ca5c431f2e1b07dd4b322a0327734",
+      "runtime": {"loader": "glibc@2.44", "library_0": "glibc@2.44"},
+      "static_host": []
+    },
+    {
+      "name": "nginx", "versions": ["1.30.5"], "variant": "minimal", "system": "linux-x86_64-musl",
+      "recipe_sha256": "fe5d68e03d467be26abd79f8c11f1d86c08fd06dbe09bc3ae60ae6cd7b52ce69",
+      "runtime": {},
+      "static_host": ["musl-dev"]
+    },
+    {
+      "name": "nginx", "versions": ["1.30.6"], "variant": "minimal", "system": "linux-x86_64-gnu",
+      "recipe_sha256": "0c651c0f547f65d248bbaf5878ff1eeefe7a0bfb0e9577a0992c64a46beed97e",
+      "runtime": {"loader": "glibc@2.44", "library_0": "glibc@2.44"},
+      "static_host": []
+    },
+    {
+      "name": "nginx", "versions": ["1.30.6"], "variant": "minimal", "system": "linux-x86_64-musl",
+      "recipe_sha256": "45966bc81366fdcce2b1eeafd02f6e8541ba18632f672e3ea515cf26172fdc1b",
+      "runtime": {},
+      "static_host": ["musl-dev"]
+    },
+    {
+      "name": "nginx", "versions": ["1.30.8"], "variant": "minimal", "system": "linux-x86_64-gnu",
+      "recipe_sha256": "7a367a11a9ab6e9ec8830235605cd1d896f96df43d5e409a5e70c29e2667aaff",
+      "runtime": {"loader": "glibc@2.44", "library_0": "glibc@2.44"},
+      "static_host": []
+    },
+    {
+      "name": "nginx", "versions": ["1.30.8"], "variant": "minimal", "system": "linux-x86_64-musl",
+      "recipe_sha256": "8d651d21cf9beafe0e0168ee0ec420eccd88e158b88924f43a41f6116f00a99c",
+      "runtime": {},
+      "static_host": ["musl-dev"]
+    }
+  ]
+}

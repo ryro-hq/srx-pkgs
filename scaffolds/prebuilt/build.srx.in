@@ -1,0 +1,30 @@
+pub struct Binary {
+    name: CommandName;
+    path: InstalledEntry;
+    timeout_seconds: BuildTimeout = 60;
+}
+
+pub fn gnu(source: support::Source) -> Recipe {
+    let binary = Binary { name = @{binary_name}; path = @{binary_path}; };
+    let output = BuildPath::Output("out", "${binary.path}");
+    let cwd = BuildPath::Work("job");
+    builders::recipe::from_source({
+        id = "@{name}";
+        source = source;
+        build = Build {
+            profile = BuildProfile::HostBootstrap;
+            resources = BuildResources::Large;
+            source_format = BuildSourceFormat::Raw;
+            source_directory = "@{name}";
+            timeout_seconds = binary.timeout_seconds;
+            steps = [
+                BuildStep::Directory(cwd),
+                BuildStep::Directory(BuildPath::Output("out", "usr/bin")),
+                BuildStep::Copy(BuildPath::Source, output),
+                builders::process::run(BuildPath::Host("/usr/bin/chmod"), cwd, [build_text("755"), build_path(output)], []),
+                BuildStep::ValidateStaticElf(output)
+            ];
+        };
+        commands = [Command { name = binary.name; path = binary.path; output = "out"; }];
+    })
+}

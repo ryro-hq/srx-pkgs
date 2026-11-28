@@ -1,0 +1,65 @@
+// The catalog selector evaluates build steps without an asset environment.
+// The generated module mirrors the pinned patch fragments as bounded literals.
+fn through_1_30_6() -> [BuildPart] {
+    [
+        BuildPart::Literal(patch_data::nginx_1_30_5_to_1_30_6_01),
+        BuildPart::Literal(patch_data::nginx_1_30_5_to_1_30_6_02),
+        BuildPart::Literal(patch_data::nginx_1_30_5_to_1_30_6_03),
+        BuildPart::Literal(patch_data::nginx_1_30_5_to_1_30_6_04),
+        BuildPart::Literal(patch_data::nginx_1_30_5_to_1_30_6_05),
+        BuildPart::Literal(patch_data::nginx_1_30_5_to_1_30_6_06),
+        BuildPart::Literal(patch_data::nginx_1_30_5_to_1_30_6_07),
+        BuildPart::Literal(patch_data::nginx_1_30_5_to_1_30_6_08),
+        BuildPart::Literal(patch_data::nginx_1_30_5_to_1_30_6_09),
+    ]
+}
+fn through_1_30_8() -> [BuildPart] {
+    [
+        BuildPart::Literal(patch_data::nginx_1_30_6_to_1_30_8_01),
+        BuildPart::Literal(patch_data::nginx_1_30_6_to_1_30_8_02),
+        BuildPart::Literal(patch_data::nginx_1_30_6_to_1_30_8_03),
+        BuildPart::Literal(patch_data::nginx_1_30_6_to_1_30_8_04),
+        BuildPart::Literal(patch_data::nginx_1_30_6_to_1_30_8_05),
+    ]
+}
+pub fn apply(version: PackagePinText, executable: BuildPath, environment: [BuildEnv]) -> [BuildStep] {
+    match version {
+        "1.30.5" => apply_release(
+            version,
+            executable,
+            environment,
+            through_1_30_6() ++ through_1_30_8()
+        ),
+        "1.30.6" => apply_release(version, executable, environment, through_1_30_8()),
+        _ => [],
+    }
+}
+fn apply_release(
+    version: PackagePinText,
+    executable: BuildPath,
+    environment: [BuildEnv],
+    parts: [BuildPart]
+) -> [BuildStep] {
+    let patch = BuildPath::Work("nginx-security-backports.patch");
+    [
+        BuildStep::Write(BuildFile {
+                path = patch;
+                text = BuildText {
+                    parts = parts;
+                };
+            }),
+        builders::process::run(
+            executable,
+            BuildPath::Work("source/nginx-${version}"),
+            [
+                build_text("--batch"),
+                build_text("--forward"),
+                build_text("--fuzz=0"),
+                build_text("-p1"),
+                build_text("-i"),
+                build_path(patch)
+            ],
+            environment
+        )
+    ]
+}

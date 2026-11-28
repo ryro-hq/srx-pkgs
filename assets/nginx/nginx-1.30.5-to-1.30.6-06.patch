@@ -1,0 +1,233 @@
+From fb0e979c6dd63c018958b41eeb844947c5c21264 Mon Sep 17 00:00:00 2001
+Subject: nginx 1.30.5 to 1.30.6 source backport (part 6)
+
+Upstream release-to-release diff for src/ and auto/, excluding src/core/nginx.h (version metadata).
+
+diff --git a/src/http/ngx_http_copy_filter_module.c b/src/http/ngx_http_copy_filter_module.c
+index 8e5de2bf70102d2a31f8cf7eef246d0469886e83..6b233c48ccd9885cfa0889c6f1bcbf1cdc993048 100644
+--- a/src/http/ngx_http_copy_filter_module.c
++++ b/src/http/ngx_http_copy_filter_module.c
+@@ -87,6 +87,13 @@ ngx_http_copy_filter(ngx_http_request_t *r, ngx_chain_t *in)
+     ngx_output_chain_ctx_t       *ctx;
+     ngx_http_core_loc_conf_t     *clcf;
+     ngx_http_copy_filter_conf_t  *conf;
++#if (NGX_HAVE_FILE_AIO)
++    ngx_output_chain_aio_pt       aio_handler;
++#endif
++#if (NGX_THREADS)
++    ngx_int_t                   (*thread_handler)(ngx_thread_task_t *task,
++                                                  ngx_file_t *file);
++#endif
+ 
+     c = r->connection;
+ 
+@@ -140,10 +147,39 @@ ngx_http_copy_filter(ngx_http_request_t *r, ngx_chain_t *in)
+ 
+ #if (NGX_HAVE_FILE_AIO || NGX_THREADS)
+     ctx->aio = r->aio;
++
++#if (NGX_HAVE_FILE_AIO)
++    aio_handler = ctx->aio_handler;
++#endif
++#if (NGX_THREADS)
++    thread_handler = ctx->thread_handler;
++#endif
++
++    /*
++     * each pending operation holds a reference in r->main->blocked;
++     * with the counter close to its limit the file is read
++     * synchronously instead, so that it cannot overflow
++     */
++
++    if (r->main->blocked >= NGX_HTTP_MAX_BLOCKED) {
++#if (NGX_HAVE_FILE_AIO)
++        ctx->aio_handler = NULL;
++#endif
++#if (NGX_THREADS)
++        ctx->thread_handler = NULL;
++#endif
++    }
+ #endif
+ 
+     rc = ngx_output_chain(ctx, in);
+ 
++#if (NGX_HAVE_FILE_AIO)
++    ctx->aio_handler = aio_handler;
++#endif
++#if (NGX_THREADS)
++    ctx->thread_handler = thread_handler;
++#endif
++
+     if (ctx->in == NULL) {
+         r->buffered &= ~NGX_HTTP_COPY_BUFFERED;
+ 
+diff --git a/src/http/ngx_http_core_module.c b/src/http/ngx_http_core_module.c
+index 53ddf39bb8723bd4f085a816765a1db746aca788..385b84e1b327e4d215823fc6276b4016b57ede54 100644
+--- a/src/http/ngx_http_core_module.c
++++ b/src/http/ngx_http_core_module.c
+@@ -1936,13 +1936,19 @@ ngx_http_map_uri_to_path(ngx_http_request_t *r, ngx_str_t *path,
+ 
+     alias = clcf->alias;
+ 
+-    if (alias && !r->valid_location) {
++    if (alias && (!r->valid_location || r->uri_changed)) {
+         ngx_log_error(NGX_LOG_ALERT, r->connection->log, 0,
+                       "\"alias\" cannot be used in location \"%V\" "
+                       "where URI was rewritten", &clcf->name);
+         return NULL;
+     }
+ 
++    if (alias > r->uri.len && alias != NGX_MAX_SIZE_T_VALUE) {
++        ngx_log_error(NGX_LOG_ALERT, r->connection->log, 0,
++                      "URI shorter than aliased URI part");
++        return NULL;
++    }
++
+     if (clcf->root_lengths == NULL) {
+ 
+         *root_length = clcf->root.len;
+diff --git a/src/http/ngx_http_file_cache.c b/src/http/ngx_http_file_cache.c
+index 5209f003b0a29771d0303b40f26070e5a5263a4c..d3d0f039cdd9867f2d42ad8ff069c43b06086e13 100644
+--- a/src/http/ngx_http_file_cache.c
++++ b/src/http/ngx_http_file_cache.c
+@@ -440,6 +440,10 @@ ngx_http_file_cache_lock(ngx_http_request_t *r, ngx_http_cache_t *c)
+         return NGX_HTTP_CACHE_SCARCE;
+     }
+ 
++    if (r->main->blocked >= NGX_HTTP_MAX_BLOCKED) {
++        return NGX_HTTP_CACHE_SCARCE;
++    }
++
+     c->waiting = 1;
+ 
+     if (c->wait_time == 0) {
+@@ -692,7 +696,9 @@ ngx_http_file_cache_aio_read(ngx_http_request_t *r, ngx_http_cache_t *c)
+ 
+ #if (NGX_HAVE_FILE_AIO)
+ 
+-    if (clcf->aio == NGX_HTTP_AIO_ON && ngx_file_aio) {
++    if (clcf->aio == NGX_HTTP_AIO_ON && ngx_file_aio
++        && r->main->blocked < NGX_HTTP_MAX_BLOCKED)
++    {
+         n = ngx_file_aio_read(&c->file, c->buf->pos, c->body_start, 0, r->pool);
+ 
+         if (n != NGX_AGAIN) {
+@@ -717,7 +723,9 @@ ngx_http_file_cache_aio_read(ngx_http_request_t *r, ngx_http_cache_t *c)
+ 
+ #if (NGX_THREADS)
+ 
+-    if (clcf->aio == NGX_HTTP_AIO_THREADS) {
++    if (clcf->aio == NGX_HTTP_AIO_THREADS
++        && r->main->blocked < NGX_HTTP_MAX_BLOCKED)
++    {
+         c->file.thread_task = c->thread_task;
+         c->file.thread_handler = ngx_http_cache_thread_handler;
+         c->file.thread_ctx = r;
+diff --git a/src/http/ngx_http_parse.c b/src/http/ngx_http_parse.c
+index 81f689e5bdd5bcddb52c336049f68ed9039a580f..ceb138079c7d6b3b3009b2dd3b46fdd78930a5bc 100644
+--- a/src/http/ngx_http_parse.c
++++ b/src/http/ngx_http_parse.c
+@@ -2404,7 +2404,7 @@ data:
+     ctx->state = state;
+     b->pos = pos;
+ 
+-    if (ctx->size > NGX_MAX_OFF_T_VALUE - 5) {
++    if (ctx->size > NGX_MAX_OFF_T_VALUE - 9) {
+         goto invalid;
+     }
+ 
+diff --git a/src/http/ngx_http_request.h b/src/http/ngx_http_request.h
+index 48eb43eb0ffca25b9aade93a7d87e09f4aa5cf98..84f3117dd5da9f781d3ef190e871c20efd17d5f1 100644
+--- a/src/http/ngx_http_request.h
++++ b/src/http/ngx_http_request.h
+@@ -11,6 +11,7 @@
+ 
+ #define NGX_HTTP_MAX_URI_CHANGES           10
+ #define NGX_HTTP_MAX_SUBREQUESTS           50
++#define NGX_HTTP_MAX_BLOCKED               250
+ 
+ /* must be 2^n */
+ #define NGX_HTTP_LC_HEADER_LEN             32
+diff --git a/src/http/ngx_http_script.c b/src/http/ngx_http_script.c
+index 9c97a5b085112e1f673a6638ecd23ba5cd83d127..2f14b350097543688f8bbe1329a667c017573436 100644
+--- a/src/http/ngx_http_script.c
++++ b/src/http/ngx_http_script.c
+@@ -156,7 +156,9 @@ ngx_http_compile_complex_value(ngx_http_compile_complex_value_t *ccv)
+ 
+     for (i = 0; i < v->len; i++) {
+         if (v->data[i] == '$') {
+-            if (v->data[i + 1] >= '1' && v->data[i + 1] <= '9') {
++            if (i + 1 < v->len
++                && v->data[i + 1] >= '1' && v->data[i + 1] <= '9')
++            {
+                 nc++;
+ 
+             } else {
+@@ -643,7 +645,7 @@ ngx_http_script_run(ngx_http_request_t *r, ngx_str_t *value,
+     e.request = r;
+     e.flushed = 1;
+ 
+-    n = len;
++    n = 0;
+ 
+     while (*(uintptr_t *) e.ip) {
+         lcode = *(ngx_http_script_len_code_pt *) e.ip;
+@@ -651,8 +653,8 @@ ngx_http_script_run(ngx_http_request_t *r, ngx_str_t *value,
+     }
+ 
+ 
+-    value->len = n;
+-    value->data = ngx_pnalloc(r->pool, n);
++    value->len = n + len;
++    value->data = ngx_pnalloc(r->pool, n + len);
+     if (value->data == NULL) {
+         return NULL;
+     }
+@@ -1234,6 +1236,7 @@ ngx_http_script_regex_start_code(ngx_http_script_engine_t *e)
+         return;
+     }
+ 
++    e->is_args = 0;
+     e->quote = code->redirect;
+ 
+     e->pos = e->buf.data;
+@@ -1847,6 +1850,7 @@ ngx_http_script_complex_value_code(ngx_http_script_engine_t *e)
+     le.ip = code->lengths->elts;
+     le.line = e->line;
+     le.request = e->request;
++    le.is_args = e->is_args;
+     le.quote = e->quote;
+ 
+     for (len = 0; *(uintptr_t *) le.ip; len += lcode(&le)) {
+@@ -1863,20 +1867,28 @@ ngx_http_script_complex_value_code(ngx_http_script_engine_t *e)
+ 
+     e->pos = e->buf.data;
+     e->end = e->buf.data + len;
++
++    e->sp->len = e->buf.len;
++    e->sp->data = e->buf.data;
++    e->sp++;
+ }
+ 
+ 
+ void
+ ngx_http_script_complex_value_end_code(ngx_http_script_engine_t *e)
+ {
++    ngx_http_variable_value_t  *val;
++
++    val = e->sp - 1;
++
+     e->ip += sizeof(ngx_http_script_complex_value_end_code_t);
+ 
+     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, e->request->connection->log, 0,
+                    "http script complex value end");
+ 
+-    e->sp->len = e->pos - e->buf.data;
+-    e->sp->data = e->buf.data;
+-    e->sp++;
++    if (val->data == e->buf.data) {
++        val->len = e->pos - e->buf.data;
++    }
+ }
+ 
+ 

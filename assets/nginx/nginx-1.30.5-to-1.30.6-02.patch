@@ -1,0 +1,143 @@
+From fb0e979c6dd63c018958b41eeb844947c5c21264 Mon Sep 17 00:00:00 2001
+Subject: nginx 1.30.5 to 1.30.6 source backport (part 2)
+
+Upstream release-to-release diff for src/ and auto/, excluding src/core/nginx.h (version metadata).
+
+diff --git a/src/event/ngx_event_openssl.c b/src/event/ngx_event_openssl.c
+index 99ec654449e2bd2b403ea4cfd1a03aa28774bb2c..bb6e04313f53536a7425f2a61a931e59e10aa80f 100644
+--- a/src/event/ngx_event_openssl.c
++++ b/src/event/ngx_event_openssl.c
+@@ -3897,6 +3897,9 @@ ngx_ssl_connection_error(ngx_connection_t *c, int sslerr, ngx_err_t err,
+             || n == SSL_R_NO_SHARED_CIPHER                           /*  193 */
+ #ifdef SSL_R_PACKET_LENGTH_TOO_LONG
+             || n == SSL_R_PACKET_LENGTH_TOO_LONG                     /*  198 */
++#endif
++#ifdef SSL_R_INVALID_ALERT
++            || n == SSL_R_INVALID_ALERT                              /*  205 */
+ #endif
+             || n == SSL_R_RECORD_LENGTH_MISMATCH                     /*  213 */
+ #ifdef SSL_R_TOO_MANY_WARNING_ALERTS
+@@ -3957,10 +3960,15 @@ ngx_ssl_connection_error(ngx_connection_t *c, int sslerr, ngx_err_t err,
+ #endif
+ #ifdef SSL_R_SSL3_SESSION_ID_TOO_LONG
+             || n == SSL_R_SSL3_SESSION_ID_TOO_LONG                   /*  300 */
++#elif (defined SSL_R_TLS_SESSION_ID_TOO_LONG)
++            || n == SSL_R_TLS_SESSION_ID_TOO_LONG                    /*  300 */
+ #endif
+ #ifdef SSL_R_BAD_ECPOINT
+             || n == SSL_R_BAD_ECPOINT                                /*  306 */
+ #endif
++#ifdef SSL_R_RECORD_LAYER_FAILURE
++            || n == SSL_R_RECORD_LAYER_FAILURE                       /*  313 */
++#endif
+ #ifdef SSL_R_RENEGOTIATE_EXT_TOO_LONG
+             || n == SSL_R_RENEGOTIATE_EXT_TOO_LONG                   /*  335 */
+             || n == SSL_R_RENEGOTIATION_ENCODING_ERR                 /*  336 */
+@@ -3993,33 +4001,8 @@ ngx_ssl_connection_error(ngx_connection_t *c, int sslerr, ngx_err_t err,
+ #ifdef SSL_R_BAD_RECORD_TYPE
+             || n == SSL_R_BAD_RECORD_TYPE                            /*  443 */
+ #endif
+-            || n == 1000 /* SSL_R_SSLV3_ALERT_CLOSE_NOTIFY */
+-#ifdef SSL_R_SSLV3_ALERT_UNEXPECTED_MESSAGE
+-            || n == SSL_R_SSLV3_ALERT_UNEXPECTED_MESSAGE             /* 1010 */
+-            || n == SSL_R_SSLV3_ALERT_BAD_RECORD_MAC                 /* 1020 */
+-            || n == SSL_R_TLSV1_ALERT_DECRYPTION_FAILED              /* 1021 */
+-            || n == SSL_R_TLSV1_ALERT_RECORD_OVERFLOW                /* 1022 */
+-            || n == SSL_R_SSLV3_ALERT_DECOMPRESSION_FAILURE          /* 1030 */
+-            || n == SSL_R_SSLV3_ALERT_HANDSHAKE_FAILURE              /* 1040 */
+-            || n == SSL_R_SSLV3_ALERT_NO_CERTIFICATE                 /* 1041 */
+-            || n == SSL_R_SSLV3_ALERT_BAD_CERTIFICATE                /* 1042 */
+-            || n == SSL_R_SSLV3_ALERT_UNSUPPORTED_CERTIFICATE        /* 1043 */
+-            || n == SSL_R_SSLV3_ALERT_CERTIFICATE_REVOKED            /* 1044 */
+-            || n == SSL_R_SSLV3_ALERT_CERTIFICATE_EXPIRED            /* 1045 */
+-            || n == SSL_R_SSLV3_ALERT_CERTIFICATE_UNKNOWN            /* 1046 */
+-            || n == SSL_R_SSLV3_ALERT_ILLEGAL_PARAMETER              /* 1047 */
+-            || n == SSL_R_TLSV1_ALERT_UNKNOWN_CA                     /* 1048 */
+-            || n == SSL_R_TLSV1_ALERT_ACCESS_DENIED                  /* 1049 */
+-            || n == SSL_R_TLSV1_ALERT_DECODE_ERROR                   /* 1050 */
+-            || n == SSL_R_TLSV1_ALERT_DECRYPT_ERROR                  /* 1051 */
+-            || n == SSL_R_TLSV1_ALERT_EXPORT_RESTRICTION             /* 1060 */
+-            || n == SSL_R_TLSV1_ALERT_PROTOCOL_VERSION               /* 1070 */
+-            || n == SSL_R_TLSV1_ALERT_INSUFFICIENT_SECURITY          /* 1071 */
+-            || n == SSL_R_TLSV1_ALERT_INTERNAL_ERROR                 /* 1080 */
+-            || n == SSL_R_TLSV1_ALERT_USER_CANCELLED                 /* 1090 */
+-            || n == SSL_R_TLSV1_ALERT_NO_RENEGOTIATION               /* 1100 */
+-#endif
+-            || n == 1121 /* SSL_R_TLSV1_ALERT_ECH_REQUIRED */
++            || (n >= SSL_AD_REASON_OFFSET                            /* 1000 */
++                && n <= SSL_AD_REASON_OFFSET + 255)
+             )
+         {
+             switch (c->log_error) {
+@@ -5212,7 +5195,7 @@ ngx_ssl_rotate_ticket_keys(SSL_CTX *ssl_ctx, ngx_log_t *log)
+     /* sync keys to the worker process memory */
+ 
+     ngx_memcpy(keys->elts, cache->ticket_keys,
+-               2 * sizeof(ngx_ssl_ticket_key_t));
++               keys->nelts * sizeof(ngx_ssl_ticket_key_t));
+ 
+     ngx_shmtx_unlock(&shpool->mutex);
+ 
+diff --git a/src/event/ngx_event_pipe.c b/src/event/ngx_event_pipe.c
+index d774903ec6e78e68206c57c77c6fdf5ae3f980c9..7bbca4b24cafb8fcb7bf7260d8842ca6b7d7a4df 100644
+--- a/src/event/ngx_event_pipe.c
++++ b/src/event/ngx_event_pipe.c
+@@ -253,6 +253,7 @@ ngx_event_pipe_read_upstream(ngx_event_pipe_t *p)
+                 chain->next = NULL;
+ 
+             } else if (!p->cacheable
++                       && !p->downstream_error
+                        && p->downstream->data == p->output_ctx
+                        && p->downstream->write->ready
+                        && !p->downstream->write->delayed)
+@@ -1111,11 +1112,7 @@ ngx_event_pipe_drain_chains(ngx_event_pipe_t *p)
+     ngx_chain_t  *cl, *tl;
+ 
+     for ( ;; ) {
+-        if (p->busy) {
+-            cl = p->busy;
+-            p->busy = NULL;
+-
+-        } else if (p->out) {
++        if (p->out) {
+             cl = p->out;
+             p->out = NULL;
+ 
+diff --git a/src/event/quic/ngx_event_quic_ssl.c b/src/event/quic/ngx_event_quic_ssl.c
+index 18992ae1be6fc18d440f2cb19dd3788d8210c3c0..8173bc85598fb4becd86e335ac4c38d984460835 100644
+--- a/src/event/quic/ngx_event_quic_ssl.c
++++ b/src/event/quic/ngx_event_quic_ssl.c
+@@ -642,6 +642,15 @@ ngx_quic_handle_crypto_frame(ngx_connection_t *c, ngx_quic_header_t *pkt,
+         return NGX_OK;
+     }
+ 
++    if (c->ssl->handshaked) {
++        /* QUIC doesn't define post-handshake messages for a client */
++
++        qc->error = NGX_QUIC_ERR_CRYPTO(SSL_AD_UNEXPECTED_MESSAGE);
++        qc->error_reason = "unexpected CRYPTO frame";
++
++        return NGX_ERROR;
++    }
++
+     ctx = ngx_quic_get_send_ctx(qc, pkt->level);
+     f = &frame->u.crypto;
+ 
+diff --git a/src/http/modules/ngx_http_charset_filter_module.c b/src/http/modules/ngx_http_charset_filter_module.c
+index e0115e1e4435794f1ee0b6da9ffdd38c6bbe2681..e2bbb0cacf8439b4f2e32ebfd1e9b1f0614b0088 100644
+--- a/src/http/modules/ngx_http_charset_filter_module.c
++++ b/src/http/modules/ngx_http_charset_filter_module.c
+@@ -1197,6 +1197,13 @@ ngx_http_charset_map_block(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+         return NGX_CONF_ERROR;
+     }
+ 
++    if (ngx_strcasecmp(value[1].data, (u_char *) "utf-8") == 0) {
++        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
++                           "\"charset_map\" with \"utf-8\" charset "
++                           "should be given in the second column");
++        return NGX_CONF_ERROR;
++    }
++
+     table = mcf->tables.elts;
+     for (i = 0; i < mcf->tables.nelts; i++) {
+         if ((src == table->src && dst == table->dst)
