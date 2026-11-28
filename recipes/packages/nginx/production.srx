@@ -1,0 +1,128 @@
+pub fn gnu(source: support::Source, compatibility: support::Compatibility) -> PackageRef<contracts::default::Settings> {
+    reference(source, compatibility, "linux-x86_64-gnu", build_gnu)
+}
+pub fn musl(source: support::Source, compatibility: support::Compatibility) -> PackageRef<contracts::default::Settings> {
+    reference(source, compatibility, "linux-x86_64-musl", build_musl)
+}
+fn reference(
+    source: support::Source,
+    compatibility: support::Compatibility,
+    system: PackagePinText,
+    build: fn(support::Source) -> Recipe
+) -> PackageRef<contracts::default::Settings> {
+    builders::configured::reference<contracts::default::Settings>({
+            source = source;
+            compatibility = compatibility;
+            system = system;
+            build = build;
+            render = contracts::default::render;
+            integrate = Option::Some(integration::nginx_validated);
+        })
+}
+fn libraries(const system: PackagePinText, zlib: RecipeRef<Recipe>) -> [OutputRef<Recipe>] {
+    [
+        recipe_output(
+            package_recipe(project::libressl({
+                        version = "4.4.1";
+                        system = system;
+                    })),
+            "out"
+        ),
+        recipe_output(package_recipe(project::pcre2({
+                        version = "10.49";
+                        system = system;
+                    })), "out"),
+        recipe_output(zlib, "out")
+    ]
+}
+fn library_flags(
+    tls: BuildInputIndex,
+    pcre: BuildInputIndex,
+    zlib: BuildInputIndex,
+    static_link: BuildLiteral
+) -> [BuildText] {
+    [
+        build_text("--with-http_ssl_module"),
+        build_join([
+                BuildPart::Literal("--with-cc-opt=-I"),
+                BuildPart::Path(BuildPath::Input(tls, "usr/include")),
+                BuildPart::Literal(" -I"),
+                BuildPart::Path(BuildPath::Input(pcre, "usr/include")),
+                BuildPart::Literal(" -I"),
+                BuildPart::Path(BuildPath::Input(zlib, "usr/include"))
+            ]),
+        build_join([
+                BuildPart::Literal("--with-ld-opt="),
+                BuildPart::Literal(static_link),
+                BuildPart::Literal("-L"),
+                BuildPart::Path(BuildPath::Input(tls, "usr/lib")),
+                BuildPart::Literal(" -L"),
+                BuildPart::Path(BuildPath::Input(pcre, "usr/lib")),
+                BuildPart::Literal(" -L"),
+                BuildPart::Path(BuildPath::Input(zlib, "usr/lib"))
+            ])
+    ]
+}
+fn require_archives(tls: BuildInputIndex, pcre: BuildInputIndex, zlib: BuildInputIndex) -> BuildStep {
+    builders::process::run(
+        BuildPath::Host("/bin/sh"),
+        BuildPath::Work("source"),
+        [
+            build_text("-eu"),
+            build_text("-c"),
+            build_text("""for archive in "$@"; do test -f "$archive"; done"""),
+            build_text("check-static-libraries"),
+            build_path(BuildPath::Input(tls, "usr/lib/libssl.a")),
+            build_path(BuildPath::Input(tls, "usr/lib/libcrypto.a")),
+            build_path(BuildPath::Input(pcre, "usr/lib/libpcre2-8.a")),
+            build_path(BuildPath::Input(zlib, "usr/lib/libz.a"))
+        ],
+        []
+    )
+}
+fn build_gnu(source: support::Source) -> Recipe {
+    builders::recipe::from_source({
+            id = "nginx";
+            source = source;
+            build = steps::build_with_options(
+                "nginx-${source.version}",
+                builders::process::argument("--with-cc=", BuildPath::Work("cc")),
+                lib::gnu::environment(),
+                lib::gnu::configure_environment(),
+                lib::gnu::setup() ++ [require_archives(2, 3, 4)],
+                [],
+                library_flags(2, 3, 4, ""),
+                []
+            );
+            build_inputs = builders::recipe::selected_inputs([
+                    recipe_output(glibc::runtime, "dev"),
+                    recipe_output(glibc::runtime, "out")
+                ] ++ libraries("linux-x86_64-gnu", recipe_ref(zlib::bootstrap::gnu)));
+            commands = [builders::recipe::gnu_command("nginx", "usr/bin/nginx", glibc::runtime, [])];
+        })
+}
+fn build_musl(source: support::Source) -> Recipe {
+    builders::recipe::from_source({
+            id = "nginx";
+            source = source;
+            build = steps::build_with_options(
+                "nginx-${source.version}",
+                builders::process::argument("--with-cc=", builders::static_library::musl_compiler()),
+                [],
+                [],
+                builders::static_library::musl_setup() ++ [require_archives(0, 1, 2)],
+                [],
+                library_flags(0, 1, 2, "-static "),
+                [BuildStep::ValidateStaticElf(BuildPath::Output("out", "usr/bin/nginx"))]
+            );
+            build_inputs = builders::recipe::selected_inputs(libraries(
+                    "linux-x86_64-musl",
+                    recipe_ref(zlib::bootstrap::musl)
+                ));
+            commands = [Command {
+                    name = "nginx";
+                    output = "out";
+                    path = "usr/bin/nginx";
+                }];
+        })
+}

@@ -1,0 +1,14 @@
+// Production builds keep the same fields as minimal but have a separate
+// nominal contract and variant identity.
+pub struct Settings {
+    listen: minimal::ListenPort = 8080;
+    proxyPass: minimal::ProxyUrl = "http://127.0.0.1:3000";
+    extraConfig: ConfigText = "";
+}
+pub fn render(settings: Settings) -> ConfigText {
+    minimal::render({
+            listen = settings.listen;
+            proxyPass = settings.proxyPass;
+            extraConfig = settings.extraConfig;
+        })
+}

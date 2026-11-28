@@ -1,0 +1,22 @@
+daemon off;
+error_log stderr;
+pid /tmp/nginx.pid;
+events {}
+http {
+  access_log off;
+  gzip on;
+  gzip_http_version 1.0;
+  gzip_min_length 1;
+  server {
+    listen 127.0.0.1:@{port} ssl;
+    server_name localhost;
+    ssl_certificate /syrox/config/qualification/server.pem;
+    ssl_certificate_key /syrox/config/qualification/server-key.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    root /syrox/config/qualification;
+    # The request succeeds only if the PCRE2-backed rewrite matches.
+    rewrite ^/$ /index.html last;
+    location = /index.html {}
+    location / { return 404; }
+  }
+}

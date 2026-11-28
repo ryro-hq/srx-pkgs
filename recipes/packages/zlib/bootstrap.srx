@@ -1,0 +1,85 @@
+// Internal static zlib for both native nginx ABIs; the public managed factory
+// and its shared outputs are unchanged.
+pub fn gnu() -> Recipe {
+    build(true)
+}
+pub fn musl() -> Recipe {
+    build(false)
+}
+fn build(gnu: bool) -> Recipe {
+    let source = releases::source("1.3.2");
+    let directory: SourceDirectory = "zlib-${source.version}";
+    let cwd = BuildPath::Work("source/${directory}");
+    let musl_env = [builders::process::env(
+            "CC",
+            build_path(builders::static_library::musl_compiler())
+        )];
+    let environment = if gnu {
+        lib::gnu::environment()
+    }
+    else {
+        musl_env
+    };
+    let configure_environment = if gnu {
+        lib::gnu::configure_environment()
+    }
+    else {
+        musl_env
+    };
+    builders::recipe::from_source({
+            id = if gnu {
+                "zlib-static-gnu"
+            }
+            else {
+                "zlib-static-musl"
+            };
+            source = source;
+            build_inputs = if gnu {
+                builders::recipe::selected_inputs([
+                        recipe_output(glibc::runtime, "dev"),
+                        recipe_output(glibc::runtime, "out")
+                    ])
+            }
+            else {
+                Option::None
+            };
+            build = Build {
+                profile = BuildProfile::HostBootstrap;
+                source_directory = directory;
+                timeout_seconds = 180;
+                steps = [BuildStep::Extract(BuildPath::Work("source"))] ++(if gnu {
+                        lib::gnu::setup()
+                    }
+                    else {
+                        builders::static_library::musl_setup()
+                    }) ++ [
+                    builders::process::run(
+                        BuildPath::Host("/bin/sh"),
+                        cwd,
+                        [build_text("./configure"), build_text("--static")],
+                        configure_environment
+                    ),
+                    builders::process::run(
+                        BuildPath::Host("/usr/bin/make"),
+                        cwd,
+                        [build_text("-j2"), build_text("libz.a")],
+                        environment
+                    ),
+                    BuildStep::Directory(BuildPath::Output("out", "usr/include")),
+                    BuildStep::Directory(BuildPath::Output("out", "usr/lib")),
+                    BuildStep::Copy(
+                        BuildPath::Work("source/${directory}/zlib.h"),
+                        BuildPath::Output("out", "usr/include/zlib.h")
+                    ),
+                    BuildStep::Copy(
+                        BuildPath::Work("source/${directory}/zconf.h"),
+                        BuildPath::Output("out", "usr/include/zconf.h")
+                    ),
+                    BuildStep::Copy(
+                        BuildPath::Work("source/${directory}/libz.a"),
+                        BuildPath::Output("out", "usr/lib/libz.a")
+                    )
+                ];
+            };
+        })
+}

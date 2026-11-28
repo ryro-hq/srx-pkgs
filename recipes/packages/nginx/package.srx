@@ -18,6 +18,12 @@ pub fn nginx(const selection: Selection) -> _ {
                 "gnu" => variants::gnu(source, compatibility),
                 "musl" => variants::musl(source, compatibility),
             }
-        }
+        },
+        "default" => match target.system {
+            "linux-x86_64" => match target.libc {
+                "gnu" => production::gnu(source, compatibility),
+                "musl" => production::musl(source, compatibility),
+            }
+        },
     }
 }

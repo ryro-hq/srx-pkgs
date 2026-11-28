@@ -112,9 +112,56 @@ pub(super) fn check() -> Result {
     }
     configured()?;
     toolchains()?;
+    nginx_variants()?;
     println!(
         "checked {count} public package/platform cases, shared libc, 4 nominal builder cases and 6 seed contracts"
     );
+    Ok(())
+}
+fn nginx_variants() -> Result {
+    let temporary = project()?;
+    let path = temporary.path();
+    for abi in ["gnu", "musl"] {
+        for (variant, selection) in [("minimal", ""), ("default", r#"variant = "default";"#)] {
+            fs::write(
+                path.join("main.srx"),
+                format!(
+                    r#"{}
+let pkgs_for_target = pkgs.forPlatform {{ system = "linux-x86_64-{abi}"; }};
+services.nginx = {{
+    package = pkgs_for_target.nginx {{ version = "1.30.8"; {selection} }};
+    settings = {{}};
+}};
+"#,
+                    header()?
+                ),
+            )?;
+            checked(path, None)?;
+            let plan = plan(path)?;
+            let summary = plan.split("\nroot ").next().ok_or("missing plan")?;
+            if !summary.contains(&format!(
+                "build \"nginx-1.30.8-{variant}-linux-x86_64-{abi}-"
+            )) || !summary.contains("validator \"check-config\"")
+            {
+                return Err(
+                    format!("nginx {abi}/{variant} lost its selection or validator").into(),
+                );
+            }
+            for prefix in [
+                format!("libressl-4.4.1-default-linux-x86_64-{abi}-"),
+                format!("pcre2-10.49-default-linux-x86_64-{abi}-"),
+                format!("zlib-static-{abi}\""),
+            ] {
+                if summary.contains(&format!("build-input \"{prefix}")) != (variant == "default") {
+                    return Err(format!(
+                        "nginx {abi}/{variant} has unexpected dependency {prefix}"
+                    )
+                    .into());
+                }
+            }
+        }
+    }
+    println!("nginx default selects all three ABI-matched build inputs; minimal stays unchanged");
     Ok(())
 }
 fn toolchains() -> Result {

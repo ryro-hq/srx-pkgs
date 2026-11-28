@@ -112,11 +112,28 @@ signed GitHub release; when building directly, allow the exact source URL
 and set `network.allow-https-redirect-origins` to include only the required
 `https://release-assets.githubusercontent.com/` origin.
 
+## nginx variants
+
+nginx 1.30.8 supports `variant = "default"` for TLS, PCRE2-backed rewrite
+and gzip. It links the catalog's LibreSSL, PCRE2 and zlib archives rather than
+the build host's copies. Existing callers still select `minimal` when
+they omit `variant`. Select the TLS-capable variant explicitly:
+
+```srx
+package = packages.nginx { version = "1.30.8"; variant = "default"; };
+```
+
+TLS support does not provision or enable HTTPS for a deployment by itself.
+Never put a production private key in `extraConfig`, tracked fixtures or a lock.
+The native HTTPS check creates a fresh test CA and localhost server certificate,
+verifies the certificate and hostname, and checks an exact gzip response reached
+through a rewrite. The separate existing HTTP check still applies to `minimal`.
+
 ## Qualification and publication
 
-The mandatory matrix also includes the above libraries, in addition to Hello
-2.12.1 and nginx 1.30.5/1.30.6, for GNU and musl. Both pinned Debian and
-Ubuntu userspaces run on the pinned Linux
+The mandatory matrix also includes the above libraries, Hello 2.12.1, nginx
+1.30.5/1.30.6 `minimal`, and both nginx 1.30.8 variants for GNU and musl.
+Both pinned Debian and Ubuntu userspaces run on the pinned Linux
 6.12.109 microVM kernel; this does not qualify distribution kernels or all Linux
 hosts. Debian produces canonical bundles and Ubuntu contributes independent reports.
 
