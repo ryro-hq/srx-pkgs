@@ -1,0 +1,31 @@
+// Generated from catalog.toml. Selection, construction and services belong to package modules.
+pub fn source(const version: PackagePinText) -> support::Source {
+    match version {
+        "10.49" => support::Source {
+            version = "10.49";
+            url = "https://github.com/PCRE2Project/pcre2/releases/download/pcre2-10.49/pcre2-10.49.tar.gz";
+            sha256 = "929f0b20e62879252a15886b06c89f1edef61a363cbd5826fb041080a5e557ae";
+            maximum_bytes = 4194304;
+        },
+    }
+}
+pub fn compatibility(
+    const version: PackagePinText,
+    const variant: PackagePinText,
+    const system: PackagePinText
+) -> support::Compatibility {
+    match version {
+        "10.49" => match variant {
+            "default" => match system {
+                "linux-x86_64-gnu" => support::Compatibility {
+                    id = "default";
+                    pin = "bb23e541e57cdd24facdf6a34c230fdf9271f8719f1fadc5890bb4e99e2e0707";
+                },
+                "linux-x86_64-musl" => support::Compatibility {
+                    id = "default";
+                    pin = "bb23e541e57cdd24facdf6a34c230fdf9271f8719f1fadc5890bb4e99e2e0707";
+                },
+            },
+        },
+    }
+}

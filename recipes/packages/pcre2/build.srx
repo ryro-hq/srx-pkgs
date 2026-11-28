@@ -1,0 +1,28 @@
+pub fn gnu(source: support::Source) -> Recipe {
+    build(source, true)
+}
+pub fn musl(source: support::Source) -> Recipe {
+    build(source, false)
+}
+fn build(source: support::Source, gnu: bool) -> Recipe {
+    builders::static_library::build({
+            id = "pcre2";
+            source = source;
+            directory = "pcre2-${source.version}";
+            gnu = gnu;
+            arguments = [
+                build_text("--enable-pcre2-16"),
+                build_text("--enable-pcre2-32"),
+                build_text("--disable-pcre2grep-libz"),
+                build_text("--disable-pcre2grep-libbz2"),
+                build_text("--disable-pcre2test-libreadline"),
+                build_text("--disable-pcre2test-libedit")
+            ];
+            commands = ["pcre2test", "pcre2grep"];
+            install = """mkdir -p "$SYROX_OUTPUT/usr/bin" "$SYROX_OUTPUT/usr/include" "$SYROX_OUTPUT/usr/lib"
+cp bin/pcre2test bin/pcre2grep "$SYROX_OUTPUT/usr/bin/"
+cp include/pcre2.h include/pcre2posix.h "$SYROX_OUTPUT/usr/include/"
+cp lib/libpcre2-8.a lib/libpcre2-16.a lib/libpcre2-32.a lib/libpcre2-posix.a "$SYROX_OUTPUT/usr/lib/"
+""";
+        })
+}

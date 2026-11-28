@@ -90,6 +90,32 @@ impl PackageSet {
                     ));
             })
     }
+    fn libressl(const packages: Self, const selection: project::LibreSslSelection) -> _ {
+        project::libressl({
+                version = selection.version;
+                variant = selection.variant;
+                system = lib::platform::tag(result_platform(
+                        packages,
+                        {
+                            system = selection.system;
+                            libc = selection.libc;
+                        }
+                    ));
+            })
+    }
+    fn pcre2(const packages: Self, const selection: project::Pcre2Selection) -> _ {
+        project::pcre2({
+                version = selection.version;
+                variant = selection.variant;
+                system = lib::platform::tag(result_platform(
+                        packages,
+                        {
+                            system = selection.system;
+                            libc = selection.libc;
+                        }
+                    ));
+            })
+    }
     fn glibc(const packages: Self, const selection: project::GlibcSelection) -> RecipeRef<Recipe> {
         project::glibc({
                 version = selection.version;

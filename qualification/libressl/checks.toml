@@ -1,0 +1,2 @@
+command = "openssl"
+version_arguments = ["version"]

@@ -1,6 +1,41 @@
 {
   "cases": [
     [
+      "package_recipe(packages.libressl { version = \"4.4.1\"; })",
+      "libressl-4.4.1-default-linux-x86_64-gnu-",
+      null
+    ],
+    [
+      "package_recipe(pkgs.forPlatform({ system = \"linux-x86_64-musl\"; }).libressl { version = \"4.4.1\"; })",
+      "libressl-4.4.1-default-linux-x86_64-musl-",
+      null
+    ],
+    [
+      "package_recipe(packages.pcre2 { version = \"10.49\"; })",
+      "pcre2-10.49-default-linux-x86_64-gnu-",
+      null
+    ],
+    [
+      "package_recipe(pkgs.forPlatform({ system = \"linux-x86_64-musl\"; }).pcre2 { version = \"10.49\"; })",
+      "pcre2-10.49-default-linux-x86_64-musl-",
+      null
+    ],
+    [
+      "package_recipe(packages.libressl { version = \"4.4.0\"; })",
+      null,
+      "no applicable case"
+    ],
+    [
+      "package_recipe(packages.pcre2 { version = \"10.48\"; })",
+      null,
+      "no applicable case"
+    ],
+    [
+      "package_recipe(pkgs.pcre2 { version = \"10.49\"; system = \"linux-aarch64\"; })",
+      null,
+      "no applicable case"
+    ],
+    [
       "package_recipe(packages.k3s { version = \"1.37.1+k3s1\"; })",
       "k3s-1.37.1+k3s1-binary-linux-x86_64-gnu-",
       null

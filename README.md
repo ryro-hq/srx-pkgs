@@ -97,10 +97,26 @@ siblings so authenticated input locators stay explicit. Realizing the package ca
 verify `k3s --version`; these examples do not activate a privileged cluster,
 provision hosts or include RKE2.
 
+## TLS and regular expression libraries
+
+LibreSSL 4.4.1 and PCRE2 10.49 provide static libraries and headers, plus
+`openssl`, `pcre2test`, and `pcre2grep`. Select an exact version through
+`forPlatform` or the top-level selectors. The GNU commands depend on the
+catalog's GNU runtime; the musl commands are static. These recipes do not
+install a CA bundle or rely on a host TLS or PCRE library.
+
+LibreSSL is the proposed TLS provider because its upstream signed source fits
+HostBootstrap as-is. The OpenSSL 3.5.9 LTS upstream archive is larger than the
+current build profiles' compressed source limits. PCRE2 uses the official
+signed GitHub release; when building directly, allow the exact source URL
+and set `network.allow-https-redirect-origins` to include only the required
+`https://release-assets.githubusercontent.com/` origin.
+
 ## Qualification and publication
 
-The mandatory application matrix contains Hello 2.12.1 and nginx 1.30.5/1.30.6 for
-GNU and musl. Both pinned Debian and Ubuntu userspaces run on the pinned Linux
+The mandatory matrix also includes the above libraries, in addition to Hello
+2.12.1 and nginx 1.30.5/1.30.6, for GNU and musl. Both pinned Debian and
+Ubuntu userspaces run on the pinned Linux
 6.12.109 microVM kernel; this does not qualify distribution kernels or all Linux
 hosts. Debian produces canonical bundles and Ubuntu contributes independent reports.
 
