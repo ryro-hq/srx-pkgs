@@ -2,6 +2,8 @@ schema = 2
 [defaults]
 nginx = "1.30.5"
 hello = "2.12.1"
+libressl = "4.4.1"
+pcre2 = "10.49"
 
 [[channels]]
 name = "nginx"
@@ -22,6 +24,139 @@ archive_suffix = ".tar.gz"
 release_policy = "numeric"
 signing_key = "24093F016FFE8602EF449BB84C8EF3DA3FD37230"
 key_file = "keys/hello.asc"
+
+[[channels]]
+name = "libressl"
+releases = "https://ftp.openbsd.org/pub/OpenBSD/LibreSSL/"
+origin = "https://ftp.openbsd.org/"
+archive_prefix = "libressl-"
+archive_suffix = ".tar.gz"
+release_policy = "numeric"
+signing_key = "A1EB079B8D3EB92B4EBD3139663AF51BD5E4D8D5"
+key_file = "keys/libressl.asc"
+
+[[channels]]
+name = "pcre2"
+releases = "https://github.com/PCRE2Project/pcre2/releases/latest"
+origin = "https://github.com/"
+redirect_origins = ["https://release-assets.githubusercontent.com/"]
+archive_prefix = "pcre2-"
+archive_suffix = ".tar.gz"
+release_policy = "github-release-tag"
+signing_key = "A95536204A3BB489715231282A98E77EB6F24CA8"
+key_file = "keys/pcre2.asc"
+
+[[releases]]
+name = "libressl"
+version = "4.4.1"
+source_url = "https://ftp.openbsd.org/pub/OpenBSD/LibreSSL/libressl-4.4.1.tar.gz"
+source_sha256 = "290cdf1b53c086255dc302f118b98602a444e9ae6d11e9bfdd8c9b1b60aa3a22"
+source_maximum_bytes = 12582912
+signature_url = "https://ftp.openbsd.org/pub/OpenBSD/LibreSSL/libressl-4.4.1.tar.gz.asc"
+source = "recipes/packages/libressl/releases.srx"
+
+[[releases.combinations]]
+variant = "default"
+system = "linux-x86_64-gnu"
+factory = "libressl"
+qualification = "qualification/libressl/checks.toml"
+recipe = "recipes/packages/libressl/package.srx"
+export = "libressl"
+contract = "recipes/packages/libressl/contracts/default.srx"
+contract_type = "Settings"
+recipe_inputs = [
+    ".syrox-core",
+    "recipes/support.srx",
+    "recipes/lib/platform.srx",
+    "recipes/lib/gnu.srx",
+    "recipes/builders/configured.srx",
+    "recipes/builders/recipe.srx",
+    "recipes/builders/process.srx",
+    "recipes/builders/static_library.srx",
+    "recipes/packages/libressl/build.srx",
+    "recipes/packages/glibc/package.srx",
+    "recipes/packages/glibc/releases.srx",
+    "recipes/packages/glibc/build.srx",
+    "recipes/packages/glibc/steps.srx",
+    "recipes/packages/glibc/patches.srx",
+    "assets/glibc/CVE-2026-19499.patch",
+]
+
+[[releases.combinations]]
+variant = "default"
+system = "linux-x86_64-musl"
+factory = "libressl"
+qualification = "qualification/libressl/checks.toml"
+recipe = "recipes/packages/libressl/package.srx"
+export = "libressl"
+contract = "recipes/packages/libressl/contracts/default.srx"
+contract_type = "Settings"
+recipe_inputs = [
+    ".syrox-core",
+    "recipes/support.srx",
+    "recipes/lib/platform.srx",
+    "recipes/builders/configured.srx",
+    "recipes/builders/recipe.srx",
+    "recipes/builders/process.srx",
+    "recipes/builders/static_library.srx",
+    "recipes/packages/libressl/build.srx",
+]
+
+[[releases]]
+name = "pcre2"
+version = "10.49"
+source_url = "https://github.com/PCRE2Project/pcre2/releases/download/pcre2-10.49/pcre2-10.49.tar.gz"
+source_sha256 = "929f0b20e62879252a15886b06c89f1edef61a363cbd5826fb041080a5e557ae"
+source_maximum_bytes = 4194304
+signature_url = "https://github.com/PCRE2Project/pcre2/releases/download/pcre2-10.49/pcre2-10.49.tar.gz.sig"
+source = "recipes/packages/pcre2/releases.srx"
+
+[[releases.combinations]]
+variant = "default"
+system = "linux-x86_64-gnu"
+factory = "pcre2"
+qualification = "qualification/pcre2/checks.toml"
+recipe = "recipes/packages/pcre2/package.srx"
+export = "pcre2"
+contract = "recipes/packages/pcre2/contracts/default.srx"
+contract_type = "Settings"
+recipe_inputs = [
+    ".syrox-core",
+    "recipes/support.srx",
+    "recipes/lib/platform.srx",
+    "recipes/lib/gnu.srx",
+    "recipes/builders/configured.srx",
+    "recipes/builders/recipe.srx",
+    "recipes/builders/process.srx",
+    "recipes/builders/static_library.srx",
+    "recipes/packages/pcre2/build.srx",
+    "recipes/packages/glibc/package.srx",
+    "recipes/packages/glibc/releases.srx",
+    "recipes/packages/glibc/build.srx",
+    "recipes/packages/glibc/steps.srx",
+    "recipes/packages/glibc/patches.srx",
+    "assets/glibc/CVE-2026-19499.patch",
+]
+
+[[releases.combinations]]
+variant = "default"
+system = "linux-x86_64-musl"
+factory = "pcre2"
+qualification = "qualification/pcre2/checks.toml"
+recipe = "recipes/packages/pcre2/package.srx"
+export = "pcre2"
+contract = "recipes/packages/pcre2/contracts/default.srx"
+contract_type = "Settings"
+recipe_inputs = [
+    ".syrox-core",
+    "recipes/support.srx",
+    "recipes/lib/platform.srx",
+    "recipes/builders/configured.srx",
+    "recipes/builders/recipe.srx",
+    "recipes/builders/process.srx",
+    "recipes/builders/static_library.srx",
+    "recipes/packages/pcre2/build.srx",
+]
 
 [[releases]]
 name = "nginx"

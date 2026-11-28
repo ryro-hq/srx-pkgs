@@ -1,0 +1,135 @@
+// Autotools libraries with static archives for downstream builds. GNU tools
+// still use the catalog libc; musl tools are fully static.
+pub struct Options {
+    id: PackageId;
+    source: support::Source;
+    directory: SourceDirectory;
+    gnu: bool;
+    arguments: [BuildText];
+    commands: [CommandName];
+    install: BuildLiteral;
+}
+pub fn musl_compiler() -> BuildPath {
+    BuildPath::Work("musl-cc")
+}
+pub fn musl_setup() -> [BuildStep] {
+    // Libtool can consume -static in LDFLAGS. The wrapper also links
+    // configure probes statically so they do not require a host musl loader.
+    [BuildStep::Write(BuildFile {
+                path = musl_compiler();
+                mode = BuildFileMode::Executable;
+                text = build_text("""#!/bin/sh
+exec /usr/bin/musl-gcc -static "$@"
+""");
+            })]
+}
+pub fn build(options: Options) -> Recipe {
+    let musl = [process::env("CC", build_path(musl_compiler()))];
+    let environment = if options.gnu {
+        lib::gnu::environment()
+    }
+    else {
+        musl
+    };
+    let configure_environment = if options.gnu {
+        lib::gnu::configure_environment()
+    }
+    else {
+        musl
+    };
+    let cwd = BuildPath::Work("source/${options.directory}");
+    let no_steps: [BuildStep] = [];
+    let validate = if options.gnu {
+        no_steps
+    }
+    else {
+        fold(
+            options.commands,
+            no_steps,
+            fn(steps: [BuildStep], name: CommandName) -> [BuildStep] {
+                steps ++ [BuildStep::ValidateStaticElf(BuildPath::Output("out", "usr/bin/${name}"))]
+            }
+        )
+    };
+    recipe::from_source({
+            id = options.id;
+            source = options.source;
+            build = Build {
+                profile = BuildProfile::HostBootstrap;
+                source_directory = options.directory;
+                timeout_seconds = 900;
+                steps = [BuildStep::Extract(BuildPath::Work("source"))] ++(if options.gnu {
+                        lib::gnu::setup()
+                    }
+                    else {
+                        musl_setup()
+                    }) ++ [
+                    process::run(
+                        BuildPath::Host("/bin/sh"),
+                        cwd,
+                        [
+                            build_text("./configure"),
+                            build_text("--prefix=/usr"),
+                            build_text("--disable-shared"),
+                            build_text("--enable-static")
+                        ] ++ options.arguments,
+                        configure_environment
+                    ),
+                    process::run(
+                        BuildPath::Host("/usr/bin/make"),
+                        cwd,
+                        [build_text("-j2")],
+                        environment
+                    ),
+                    process::run(
+                        BuildPath::Host("/usr/bin/make"),
+                        cwd,
+                        [build_text("install"), build_text("DESTDIR=/work/stage")],
+                        environment
+                    ),
+                    process::run(
+                        BuildPath::Host("/bin/sh"),
+                        BuildPath::Work("stage/usr"),
+                        [build_text("-eu"), build_text("-c"), build_text(options.install)],
+                        [
+                            process::env("SYROX_OUTPUT", build_path(BuildPath::Output("out", ""))),
+                            process::env(
+                                "SYROX_INSTALLED",
+                                build_path(BuildPath::Installed("out", ""))
+                            )
+                        ]
+                    )
+                ] ++ validate;
+            };
+            build_inputs = if options.gnu {
+                recipe::selected_inputs([
+                        recipe_output(packages::glibc::runtime, "dev"),
+                        recipe_output(packages::glibc::runtime, "out")
+                    ])
+            }
+            else {
+                Option::None
+            };
+            commands = fold(
+                options.commands,
+                [],
+                fn(commands: [Command], name: CommandName) -> [Command] {
+                    commands ++ [if options.gnu {
+                            recipe::gnu_command(
+                                name,
+                                "usr/bin/${name}",
+                                packages::glibc::runtime,
+                                []
+                            )
+                        }
+                        else {
+                            Command {
+                                name = name;
+                                output = "out";
+                                path = "usr/bin/${name}";
+                            }
+                        }]
+                }
+            );
+        })
+}

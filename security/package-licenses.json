@@ -2,6 +2,26 @@
   "schema": 1,
   "packages": [
     {
+      "name": "libressl",
+      "version": "4.4.1",
+      "license": "OpenSSL AND ISC AND BSD-2-Clause AND BSD-3-Clause",
+      "url": "https://ftp.openbsd.org/pub/OpenBSD/LibreSSL/libressl-4.4.1.tar.gz",
+      "sha256": "290cdf1b53c086255dc302f118b98602a444e9ae6d11e9bfdd8c9b1b60aa3a22",
+      "purl": "pkg:generic/libressl@4.4.1",
+      "cpe": "cpe:2.3:a:openbsd:libressl:4.4.1:*:*:*:*:*:*:*",
+      "license_files": ["COPYING"]
+    },
+    {
+      "name": "pcre2",
+      "version": "10.49",
+      "license": "BSD-3-Clause WITH PCRE2-exception",
+      "url": "https://github.com/PCRE2Project/pcre2/releases/download/pcre2-10.49/pcre2-10.49.tar.gz",
+      "sha256": "929f0b20e62879252a15886b06c89f1edef61a363cbd5826fb041080a5e557ae",
+      "purl": "pkg:generic/pcre2@10.49",
+      "cpe": "cpe:2.3:a:pcre:pcre2:10.49:*:*:*:*:*:*:*",
+      "license_files": ["LICENCE.md"]
+    },
+    {
       "name": "nginx",
       "version": "1.30.5",
       "license": "BSD-2-Clause",

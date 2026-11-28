@@ -23,6 +23,8 @@ pub use catalog::packages::nginx::integration::{
 };
 pub use catalog::packages::nginx::nginx;
 pub use catalog::packages::hello::hello;
+pub use catalog::packages::libressl::libressl;
+pub use catalog::packages::pcre2::pcre2;
 pub use catalog::lib::set::{
     forPlatform,
     PackageSet
@@ -33,6 +35,8 @@ pub use catalog::lib::platform::{
 };
 pub type NginxSelection = catalog::packages::nginx::Selection;
 pub type HelloSelection = catalog::packages::hello::Selection;
+pub type LibreSslSelection = catalog::packages::libressl::Selection;
+pub type Pcre2Selection = catalog::packages::pcre2::Selection;
 pub type GlibcSelection = catalog::packages::glibc::Selection;
 pub type GitSelection = catalog::packages::git::Selection;
 pub type ZlibSelection = catalog::packages::zlib::Selection;

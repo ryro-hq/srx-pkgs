@@ -1,0 +1,28 @@
+pub fn gnu(source: support::Source) -> Recipe {
+    build(source, true)
+}
+pub fn musl(source: support::Source) -> Recipe {
+    build(source, false)
+}
+fn build(source: support::Source, gnu: bool) -> Recipe {
+    builders::static_library::build({
+            id = "libressl";
+            source = source;
+            directory = "libressl-${source.version}";
+            gnu = gnu;
+            arguments = [
+                build_text("--disable-tests"),
+                builders::process::argument(
+                    "--with-openssldir=",
+                    BuildPath::Installed("out", "usr/share/libressl")
+                )
+            ];
+            commands = ["openssl"];
+            install = """mkdir -p "$SYROX_OUTPUT/usr/bin" "$SYROX_OUTPUT/usr/include" "$SYROX_OUTPUT/usr/lib" "$SYROX_OUTPUT/usr/share/libressl"
+cp bin/openssl "$SYROX_OUTPUT/usr/bin/"
+cp -R include/openssl include/tls.h "$SYROX_OUTPUT/usr/include/"
+cp lib/libcrypto.a lib/libssl.a lib/libtls.a "$SYROX_OUTPUT/usr/lib/"
+cp "/work/stage$SYROX_INSTALLED/usr/share/libressl/openssl.cnf" "$SYROX_OUTPUT/usr/share/libressl/"
+""";
+        })
+}

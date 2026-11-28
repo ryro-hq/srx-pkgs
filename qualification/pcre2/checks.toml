@@ -1,0 +1,2 @@
+command = "pcre2test"
+version_arguments = ["-version"]

@@ -214,7 +214,7 @@ jobs:
       - name: Configure exact source permissions
         run: |
           {
-            printf '[build]\nhost-toolchain = "/usr"\n[network]\nallow-https = [\n'
+            printf '[build]\nhost-toolchain = "/usr"\n[network]\nallow-https-redirect-origins = ["https://release-assets.githubusercontent.com/"]\nallow-https = [\n'
             jq -r '.versions[].package.source_url | @json + ","' Catalog.lock | sort -u
             printf '"https://ftp.gnu.org/gnu/glibc/glibc-2.44.tar.xz",\n]\n'
           } > build.toml

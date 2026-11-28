@@ -220,7 +220,10 @@ fn upstream(directory: &Path, policy: &Value, index: usize) -> Result<Value> {
     let pin = text(policy, "sha256")?;
     let sources = directory.join("sources");
     fs::create_dir_all(&sources)?;
-    if !name.bytes().all(|b| b.is_ascii_lowercase())
+    if !name.starts_with(|c: char| c.is_ascii_lowercase())
+        || !name
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit())
         || !version.bytes().all(|b| b.is_ascii_digit() || b == b'.')
     {
         return Err("unsafe upstream filename".into());
