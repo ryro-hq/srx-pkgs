@@ -216,7 +216,7 @@ jobs:
           {
             printf '[build]\nhost-toolchain = "/usr"\n[network]\nallow-https-redirect-origins = ["https://release-assets.githubusercontent.com/"]\nallow-https = [\n'
             jq -r '.versions[].package.source_url | @json + ","' Catalog.lock | sort -u
-            printf '"https://ftp.gnu.org/gnu/glibc/glibc-2.44.tar.xz",\n]\n'
+            printf '"https://ftp.gnu.org/gnu/glibc/glibc-2.44.tar.xz",\n"https://zlib.net/fossils/zlib-1.3.2.tar.gz",\n]\n'
           } > build.toml
       - name: Build, run, validate HTTP and import offline in the VM
         working-directory: .core

@@ -1,0 +1,18 @@
+command = "nginx"
+version_arguments = ["-V"]
+
+[http]
+filename = "nginx.conf"
+configuration = "qualification/nginx/tls.conf.in"
+invalid_configuration = "qualification/nginx/invalid.conf"
+validate_arguments = ["-t", "-c", "@{config}"]
+run_arguments = ["-c", "@{config}"]
+response = "syrox-qualified-https-with-pcre2-and-gzip"
+
+[http.tls]
+gzip = true
+
+[service]
+project = "qualification/nginx/service.srx.in"
+valid_settings = "qualification/nginx/valid-settings.srx.in"
+invalid_settings = "qualification/nginx/invalid-settings.srx.in"

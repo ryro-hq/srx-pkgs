@@ -105,6 +105,7 @@ pub(super) fn catalog(directory: &Path) -> Result {
     let mut packages = Vec::new();
     let mut relations = Vec::new();
     let mut seen = BTreeSet::new();
+    let mut nginx_tls_versions = BTreeSet::new();
     let mut gnu = false;
     let mut musl = false;
     for report in manifest["packages"]
@@ -121,6 +122,9 @@ pub(super) fn catalog(directory: &Path) -> Result {
             .ok_or("manifest identity absent from current lock")?;
         let name = text(&locked["package"], "name")?;
         let version = text(&locked["package"], "version")?;
+        if name == "nginx" && locked["package"]["variant"] == "default" {
+            nginx_tls_versions.insert(version.clone());
+        }
         if report["system"] == "linux-x86_64-gnu" {
             gnu = true;
         } else if report["system"] == "linux-x86_64-musl" {
@@ -145,6 +149,40 @@ pub(super) fn catalog(directory: &Path) -> Result {
                 return Err("license policy differs from qualified source".into());
             }
             packages.push(upstream(directory, pin, packages.len())?);
+        }
+    }
+    if !nginx_tls_versions.is_empty() {
+        let approvals = policy["packages"]
+            .as_array()
+            .ok_or("missing package license policy")?;
+        let zlib = approvals
+            .iter()
+            .find(|entry| entry["role"] == "nginx-static-zlib")
+            .ok_or("missing static zlib source/license policy")?;
+        let source = fs::read_to_string(text(zlib, "recipe_source")?)?;
+        if !source.contains(&format!("\"{}\"", text(zlib, "sha256")?))
+            || !source.contains(&format!("\"{}\"", text(zlib, "url")?))
+        {
+            return Err("zlib source differs from reviewed license policy".into());
+        }
+        packages.push(upstream(directory, zlib, packages.len())?);
+        let component_id = |name: &str, version: &str| {
+            packages
+                .iter()
+                .find(|entry| entry["name"] == name && entry["versionInfo"] == version)
+                .and_then(|entry| entry["SPDXID"].as_str())
+                .ok_or("nginx dependency missing from qualified SBOM")
+        };
+        let zlib_version = text(zlib, "version")?;
+        for version in nginx_tls_versions {
+            let nginx = component_id("nginx", &version)?;
+            for (name, version) in [
+                ("libressl", "4.4.1"),
+                ("pcre2", "10.49"),
+                ("zlib", zlib_version.as_str()),
+            ] {
+                relations.push(relation(nginx, "STATIC_LINK", component_id(name, version)?));
+            }
         }
     }
     if gnu {

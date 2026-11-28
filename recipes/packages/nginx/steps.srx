@@ -6,6 +6,31 @@ pub fn build(
     before: [BuildStep],
     static_link: [BuildText]
 ) -> Build {
+    build_with_options(
+        directory,
+        compiler,
+        environment,
+        configure_environment,
+        before,
+        [
+            build_text("--without-http_rewrite_module"),
+            build_text("--without-pcre"),
+            build_text("--without-http_gzip_module")
+        ],
+        static_link,
+        []
+    )
+}
+pub fn build_with_options(
+    directory: SourceDirectory,
+    compiler: BuildText,
+    environment: [BuildEnv],
+    configure_environment: [BuildEnv],
+    before: [BuildStep],
+    features: [BuildText],
+    link: [BuildText],
+    after: [BuildStep]
+) -> Build {
     let cwd = BuildPath::Work("source/${directory}");
     Build {
         profile = BuildProfile::HostBootstrap;
@@ -38,10 +63,8 @@ sed -i 's/geteuid() == 0/0/g; s/geteuid() != 0/1/g' src/core/nginx.c src/os/unix
                     build_join([
                             BuildPart::Literal("--prefix="),
                             BuildPart::Path(BuildPath::Installed("out", "usr"))
-                        ]),
-                    build_text("--without-http_rewrite_module"),
-                    build_text("--without-pcre"),
-                    build_text("--without-http_gzip_module"),
+                        ])
+                ] ++ features ++ [
                     build_text("--without-http_auth_basic_module"),
                     build_text("--without-http-cache"),
                     build_text("--error-log-path=stderr"),
@@ -53,7 +76,7 @@ sed -i 's/geteuid() == 0/0/g; s/geteuid() != 0/1/g' src/core/nginx.c src/os/unix
                     build_text("--http-fastcgi-temp-path=/tmp/fastcgi"),
                     build_text("--http-uwsgi-temp-path=/tmp/uwsgi"),
                     build_text("--http-scgi-temp-path=/tmp/scgi")
-                ] ++ static_link,
+                ] ++ link,
                 configure_environment
             ),
             builders::process::run(
@@ -67,6 +90,6 @@ sed -i 's/geteuid() == 0/0/g; s/geteuid() != 0/1/g' src/core/nginx.c src/os/unix
                 BuildPath::Work("source/${directory}/objs/nginx"),
                 BuildPath::Output("out", "usr/bin/nginx")
             ),
-        ];
+        ] ++ after;
     }
 }

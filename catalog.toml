@@ -1,6 +1,6 @@
 schema = 2
 [defaults]
-nginx = "1.30.5"
+nginx = "1.30.8"
 hello = "2.12.1"
 libressl = "4.4.1"
 pcre2 = "10.49"
@@ -274,6 +274,139 @@ recipe_inputs = [
   "recipes/builders/configured.srx",
     "recipes/builders/process.srx",
     "recipes/lib/platform.srx",
+    "recipes/packages/nginx/variants.srx",
+    "recipes/packages/nginx/build.srx",
+    "recipes/packages/nginx/steps.srx",
+    "recipes/packages/nginx/integration.srx",
+]
+
+[[releases]]
+name = "nginx"
+version = "1.30.8"
+source_url = "https://nginx.org/download/nginx-1.30.8.tar.gz"
+source_sha256 = "f867314ada32e717b949930859656c48a72dc6657aec598db58af2f98a40e1c1"
+source_maximum_bytes = 2097152
+signature_url = "https://nginx.org/download/nginx-1.30.8.tar.gz.asc"
+source = "recipes/packages/nginx/releases.srx"
+
+[[releases.combinations]]
+variant = "default"
+system = "linux-x86_64-gnu"
+factory = "nginx"
+qualification = "qualification/nginx/default.toml"
+recipe = "recipes/packages/nginx/package.srx"
+export = "nginx"
+contract = "recipes/packages/nginx/contracts/default.srx"
+contract_type = "Settings"
+recipe_inputs = [
+    ".syrox-core",
+    "recipes/support.srx",
+    "recipes/lib/platform.srx",
+    "recipes/lib/gnu.srx",
+    "recipes/builders/configured.srx",
+    "recipes/builders/recipe.srx",
+    "recipes/builders/process.srx",
+    "recipes/builders/static_library.srx",
+    "recipes/packages/nginx/production.srx",
+    "recipes/packages/nginx/contracts/minimal.srx",
+    "recipes/packages/nginx/steps.srx",
+    "recipes/packages/nginx/integration.srx",
+    "recipes/packages/libressl/package.srx",
+    "recipes/packages/libressl/build.srx",
+    "recipes/packages/libressl/releases.srx",
+    "recipes/packages/libressl/contracts/default.srx",
+    "recipes/packages/pcre2/package.srx",
+    "recipes/packages/pcre2/build.srx",
+    "recipes/packages/pcre2/releases.srx",
+    "recipes/packages/pcre2/contracts/default.srx",
+    "recipes/packages/zlib/bootstrap.srx",
+    "recipes/packages/zlib/releases.srx",
+    "recipes/packages/glibc/package.srx",
+    "recipes/packages/glibc/releases.srx",
+    "recipes/packages/glibc/build.srx",
+    "recipes/packages/glibc/steps.srx",
+    "recipes/packages/glibc/patches.srx",
+    "assets/glibc/CVE-2026-19499.patch",
+]
+
+[[releases.combinations]]
+variant = "default"
+system = "linux-x86_64-musl"
+factory = "nginx"
+qualification = "qualification/nginx/default.toml"
+recipe = "recipes/packages/nginx/package.srx"
+export = "nginx"
+contract = "recipes/packages/nginx/contracts/default.srx"
+contract_type = "Settings"
+recipe_inputs = [
+    ".syrox-core",
+    "recipes/support.srx",
+    "recipes/lib/platform.srx",
+    "recipes/builders/configured.srx",
+    "recipes/builders/recipe.srx",
+    "recipes/builders/process.srx",
+    "recipes/builders/static_library.srx",
+    "recipes/packages/nginx/production.srx",
+    "recipes/packages/nginx/contracts/minimal.srx",
+    "recipes/packages/nginx/steps.srx",
+    "recipes/packages/nginx/integration.srx",
+    "recipes/packages/libressl/package.srx",
+    "recipes/packages/libressl/build.srx",
+    "recipes/packages/libressl/releases.srx",
+    "recipes/packages/libressl/contracts/default.srx",
+    "recipes/packages/pcre2/package.srx",
+    "recipes/packages/pcre2/build.srx",
+    "recipes/packages/pcre2/releases.srx",
+    "recipes/packages/pcre2/contracts/default.srx",
+    "recipes/packages/zlib/bootstrap.srx",
+    "recipes/packages/zlib/releases.srx",
+]
+
+[[releases.combinations]]
+variant = "minimal"
+system = "linux-x86_64-gnu"
+factory = "nginx"
+qualification = "qualification/nginx/checks.toml"
+recipe = "recipes/packages/nginx/package.srx"
+export = "nginx"
+contract = "recipes/packages/nginx/contracts/minimal.srx"
+contract_type = "Settings"
+recipe_inputs = [
+    ".syrox-core",
+    "recipes/support.srx",
+    "recipes/lib/platform.srx",
+    "recipes/lib/gnu.srx",
+    "recipes/builders/configured.srx",
+    "recipes/builders/recipe.srx",
+    "recipes/builders/process.srx",
+    "recipes/packages/nginx/variants.srx",
+    "recipes/packages/nginx/build.srx",
+    "recipes/packages/nginx/steps.srx",
+    "recipes/packages/nginx/integration.srx",
+    "recipes/packages/glibc/package.srx",
+    "recipes/packages/glibc/releases.srx",
+    "recipes/packages/glibc/build.srx",
+    "recipes/packages/glibc/steps.srx",
+    "recipes/packages/glibc/patches.srx",
+    "assets/glibc/CVE-2026-19499.patch",
+]
+
+[[releases.combinations]]
+variant = "minimal"
+system = "linux-x86_64-musl"
+factory = "nginx"
+qualification = "qualification/nginx/checks.toml"
+recipe = "recipes/packages/nginx/package.srx"
+export = "nginx"
+contract = "recipes/packages/nginx/contracts/minimal.srx"
+contract_type = "Settings"
+recipe_inputs = [
+    ".syrox-core",
+    "recipes/support.srx",
+    "recipes/lib/platform.srx",
+    "recipes/builders/configured.srx",
+    "recipes/builders/recipe.srx",
+    "recipes/builders/process.srx",
     "recipes/packages/nginx/variants.srx",
     "recipes/packages/nginx/build.srx",
     "recipes/packages/nginx/steps.srx",
